@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Save the Date — April 30, 2027</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+/* ---- TOKENS ---- */
+:root {
+  --parchment: #F7F1E4;
+  --clay:      #C97C5D;
+  --stone:     #E6C79A;
+  --sage:      #6C7C58;
+  --sky:       #AFC9D6;
+  --ink:       #3B322A;
+  --gold:      #B8912F;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: auto; }
+
+/*
+  IMPORTANT: html and body must NOT have overflow:hidden/auto —
+  that breaks position:sticky on .viewport-pin.
+*/
+body {
+  font-family: 'EB Garamond', serif;
+  color: var(--parchment);
+  background: var(--ink);
+}
+
+/* ---- SCROLL ENGINE ----
+   360vh, up from 260vh: the extra room is for a new closing beat where
+   the villa scene and its text dissolve into a real couple photo (see
+   .layer-couple below). */
+.scroll-container {
+  height: 360vh;
+  position: relative;
+  /* NO overflow:hidden here — it would break sticky */
+}
+
+.viewport-pin {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow: hidden;       /* clips the parallax layers, OK on this element */
+}
+
+/* ---- ALL LAYERS share absolute inset:0 ---- */
+.layer-villa,
+.layer-couple,
+.content-layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---- LAYER 1: SKY (pure CSS gradient, barely moves) ----
+   NOT inset:0 like the others. GSAP shifts this layer by yPercent:-5 at
+   full scroll — yPercent moves an element relative to its OWN box size,
+   so an inset:0 box (exactly viewport-sized) shifting up by 5% would
+   uncover a gap at the bottom equal to 5% of the viewport, revealing the
+   raw dark body background instead of sky/parchment. Oversizing the box
+   by 8% top and bottom gives the translate room to move without ever
+   exposing that gap, regardless of viewport aspect ratio. (.layer-villa
+   doesn't need this: its 1.55x scale already comfortably overflows the
+   viewport on its own, so the same translate never uncovers an edge.) */
+.layer-sky {
+  position: absolute;
+  top: -8%;
+  bottom: -8%;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  background: linear-gradient(to bottom,
+    var(--sky)       0%,
+    var(--parchment) 65%
+  );
+  will-change: transform;
+}
+
+/* ---- LAYER 2: VILLA — a single real cutout, not a crop trick ----
+   villa-cutout.png has a genuinely transparent background (produced by
+   chroma-keying villa.png's painted-white background out to alpha 0), so
+   this is ONE image floating over the sky layer — no second copy of the
+   artwork anywhere, which is what was causing the double-image/ghosting
+   look before. Depth now comes from this single layer scaling/drifting
+   against the near-static sky behind it. */
+.layer-villa {
+  z-index: 2;
+  background-image: url('villa-cutout.webp');
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center center;
+  filter: drop-shadow(0 18px 34px rgba(30,20,10,0.22));
+  transform-origin: 50% 60%;  /* converge toward the fountain arch as it scales up */
+  will-change: transform;
+}
+
+/* ---- SPARKLES ----
+   Children of .layer-villa so they translate+scale with it.
+   Positioned near the fountain basin (x≈47-52%, y≈69-74% of the frame). */
+.sparkle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff6de 0%, rgba(255,246,222,0) 70%);
+  opacity: 0;
+  pointer-events: none;
+  animation: twinkle 2.6s ease-in-out infinite;
+}
+.sparkle:nth-child(1) { left: 47.8%; top: 71%; animation-delay: 0.0s; }
+.sparkle:nth-child(2) { left: 50.6%; top: 69%; animation-delay: 0.7s; }
+.sparkle:nth-child(3) { left: 49.2%; top: 72%; animation-delay: 1.4s; }
+.sparkle:nth-child(4) { left: 51.5%; top: 70%; animation-delay: 2.0s; }
+
+@keyframes twinkle {
+  0%,  100% { opacity: 0;    transform: translateY(0)   scale(0.6); }
+  50%        { opacity: 0.85; transform: translateY(-6px) scale(1);   }
+}
+
+/* ---- LAYER 3: COUPLE PHOTO (the closing beat) ----
+   Sits above the villa layer, starts fully transparent, and crossfades
+   in near the end of the scroll as the villa scene (and all its text)
+   fades out — see the GSAP timeline's final section. cover (not contain
+   like the villa illustration) since this is a real photo we want to
+   fill the frame with, not letterbox. background-position biased toward
+   38% down keeps the couple's faces comfortably in frame whether a given
+   screen crops the sides (wide desktop) or the top/bottom (tall phone). */
+.layer-couple {
+  z-index: 3;
+  background-image: url('couple-2.webp');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center 38%;
+  opacity: 0;
+  will-change: opacity;
+}
+
+/* ---- BIRDS (CSS loop, not scroll-scrubbed) ---- */
+/* Wrapper so the closing-beat fade-out (GSAP, inline style) has something
+   to animate that isn't already fighting the birds' own CSS keyframe
+   animation for the opacity property — animating .bird directly would be
+   overridden by its running @keyframes each frame. */
+.birds-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.bird {
+  position: absolute;
+  width: 22px;
+  height: auto;
+  opacity: 0;
+  pointer-events: none;
+}
+.bird svg { width: 100%; height: 100%; display: block; }
+
+.bird-a { top: 16%; animation: flyA 19s linear infinite; animation-delay: 2s;  }
+.bird-b { top: 22%; width: 16px; animation: flyB 23s linear infinite; animation-delay: 9s;  }
+.bird-c { top: 12%; width: 14px; animation: flyA 27s linear infinite; animation-delay: 15s; }
+
+@keyframes flyA {
+  0%   { left: -5%;  opacity: 0;    }
+  5%   { opacity: 0.55; }
+  95%  { opacity: 0.55; }
+  100% { left: 106%; opacity: 0;    }
+}
+@keyframes flyB {
+  0%   { left: 110%; opacity: 0;    }
+  5%   { opacity: 0.40; }
+  95%  { opacity: 0.40; }
+  100% { left: -6%;  opacity: 0;    }
+}
+
+/* ---- CONTENT LAYER ----
+   Top-anchored now: "Save The Date" sits up in the sky band, with the
+   rest of the copy stacking downward beneath it as you scroll. */
+.content-layer {
+  z-index: 6;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 9vh 6vw 6vh;
+  pointer-events: none;
+}
+
+.content-panel {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Shared "chip" look for the text backgrounds below: a tight, solid,
+   warm-ink plate directly behind each text group — not blurred, not
+   oversized — so contrast is guaranteed without fogging over the
+   villa artwork in the (much more visible) space around/between them.
+   alpha 0.66 is the verified minimum for ~5.6:1 contrast against the
+   worst-case light background behind it. */
+
+/* ---- TEXT — initial hidden states driven to final via GSAP scrub ---- */
+
+.headline {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 500;
+  font-size: clamp(2.4rem, 8.5vw, 6.4rem);
+  line-height: 0.98;
+  letter-spacing: 0.01em;
+  color: #FFFFFF;
+  margin: 0 0 0.22em;
+  white-space: nowrap;
+  /* Visible immediately at scroll 0, at reduced scale — GSAP grows this to
+     full size over just the first ~30% of scroll (a "small scroll"),
+     rather than holding it invisible until deep into the page. */
+  transform: scale(0.68);
+  transform-origin: center top;
+}
+
+/* Plain inline-blocks — no per-word reveal animation, the headline is
+   visible from the start (see .headline scale above). */
+.headline .w {
+  display: inline-block;
+}
+
+/* "We're getting married" — appears below the headline after a small
+   scroll, noticeably bigger than a typical small label. */
+.eyebrow {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(1.3rem, 3.4vw, 2.1rem);
+  text-transform: uppercase;
+  color: #2B2620;
+  opacity: 0;
+  letter-spacing: 0.5em;
+  transform: translateY(10px);
+  margin-bottom: 0.7em;
+}
+
+.flourish {
+  width: 64px;
+  height: 14px;
+  opacity: 0;
+  margin-bottom: 0.7em;
+}
+.flourish svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35em;
+}
+
+.date {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(1.5rem, 3.6vw, 2.4rem);
+  letter-spacing: 0.06em;
+  color: #2B2620;
+  opacity: 0;
+  transform: translateY(16px) scale(0.97);
+}
+
+.place {
+  font-family: 'EB Garamond', serif;
+  font-weight: 600;
+  font-size: clamp(1.05rem, 2.4vw, 1.4rem);
+  text-transform: uppercase;
+  color: #2B2620;
+  opacity: 0;
+  letter-spacing: 0.4em;
+  transform: translateY(8px);
+}
+
+/* ---- MOBILE ---- */
+@media (max-width: 520px) {
+  .headline {
+    font-size: clamp(2.2rem, 11vw, 3.4rem);
+    white-space: normal;           /* allow wrap on very narrow screens */
+  }
+  .content-layer {
+    padding: 6vh 4vw 4vh;
+  }
+}
+
+/* ---- REDUCED MOTION: static "arrived" end-state, no JS scrub ----
+   Final state is now the couple photo, fully settled in — villa/text
+   already faded out, matching where the scrubbed version ends up. */
+@media (prefers-reduced-motion: reduce) {
+  .layer-villa,
+  .headline,
+  .eyebrow,
+  .flourish,
+  .date,
+  .place    { opacity: 0 !important; }
+  .layer-couple { opacity: 1; }
+
+  /* Kill decorative loops */
+  .sparkle,
+  .bird { animation: none !important; opacity: 0 !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="scroll-container">
+  <div class="viewport-pin">
+
+    <!-- Layer 1: sky gradient — barely moves -->
+    <div class="layer-sky"></div>
+
+    <!-- Layer 2: villa cutout (real transparent background) — the only
+         image layer. Sparkles are children so they scale/translate with it. -->
+    <div class="layer-villa">
+      <div class="sparkle" aria-hidden="true"></div>
+      <div class="sparkle" aria-hidden="true"></div>
+      <div class="sparkle" aria-hidden="true"></div>
+      <div class="sparkle" aria-hidden="true"></div>
+    </div>
+
+    <!-- Layer 3: couple photo — crossfades in as the closing beat, see GSAP -->
+    <div class="layer-couple"></div>
+
+    <!-- Birds: CSS-only loop, not scroll-scrubbed. Wrapped so the closing
+         beat can fade them out as a group (see .birds-wrap CSS comment). -->
+    <div class="birds-wrap">
+      <div class="bird bird-a" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><path d="M1 8C4 3 8 3 12 7C16 3 20 3 23 8" stroke="#5A4A38" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+      <div class="bird bird-b" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><path d="M1 8C4 3 8 3 12 7C16 3 20 3 23 8" stroke="#5A4A38" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+      <div class="bird bird-c" aria-hidden="true"><svg viewBox="0 0 24 12" fill="none"><path d="M1 8C4 3 8 3 12 7C16 3 20 3 23 8" stroke="#5A4A38" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+    </div>
+
+    <!-- Content: headline visible immediately (top, in the sky band);
+         eyebrow/flourish/date/place stack in below it as you scroll. -->
+    <div class="content-layer">
+      <div class="content-panel">
+        <h1 class="headline" aria-label="Save The Date"><span class="w">Save</span> <span class="w">The</span> <span class="w">Date</span></h1>
+        <div class="eyebrow">We're getting married</div>
+        <div class="flourish">
+          <svg viewBox="0 0 64 14">
+            <path d="M0 7H24M40 7H64" stroke="#B8912F" stroke-width="1"/>
+            <circle cx="32" cy="7" r="3.4" fill="none" stroke="#B8912F" stroke-width="1"/>
+          </svg>
+        </div>
+        <div class="details">
+          <div class="date">April 30th, 2027</div>
+          <div class="place">Orlando, FL, USA</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- GSAP 3.12.5 — verified 200 on cdnjs.cloudflare.com -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+// Gate ALL scroll animation — users who prefer reduced motion get the CSS fallback only.
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  /*
+    Timeline scrubbed to the full 360vh scroll container.
+    Scroll 0% → timeline 0, scroll 100% → timeline end (~1.38 units —
+    see the closing beat below for why it runs past 1.0).
+
+    Text resolves EARLY (by ~0.40) over two "small scrolls", then the
+    villa journey continues zooming toward the fountain with the text
+    already settled in place, arriving and holding briefly around 1.0 —
+    then the whole scene (villa art + all its text) dissolves into the
+    real couple photo as a closing beat:
+
+      0.00        Save The Date visible immediately, growing
+      0.00 – 0.30  headline grows to full size
+      0.14         "We're getting married" appears below it, bigger
+      0.22         flourish divider fades in
+      0.28         date rises in
+      0.34         location tracks in
+      0.00 – 1.00  villa layer continuously scales/drifts the whole time
+      1.00 – 1.05  brief hold, arrived at the fountain
+      1.05 – 1.30  CROSSFADE — villa + all text fade out, couple photo fades in
+      1.30 – 1.38  hold on the couple photo
+  */
+  const tl = gsap.timeline({
+    scrollTrigger: {
+      trigger: '.scroll-container',
+      start: 'top top',
+      end: 'bottom bottom',
+      scrub: 1
+    }
+  });
+
+  /* ---- Continuous single-layer drift/zoom across the whole journey ---- */
+  tl.to('.layer-sky',   { yPercent: -5,                     ease: 'none',         duration: 1 }, 0)
+    .to('.layer-villa', { scale: 1.55, yPercent: -10,       ease: 'power1.inOut', duration: 1 }, 0);
+
+  /* ---- Headline: visible from frame one, grows over the first small scroll ---- */
+  tl.to('.headline', {
+    scale: 1,
+    ease: 'power2.out',
+    duration: 0.30
+  }, 0);
+
+  /* ---- "We're getting married" arrives below the headline ---- */
+  tl.to('.eyebrow', {
+    opacity: 1,
+    letterSpacing: '0.32em',
+    y: 0,
+    ease: 'power2.out',
+    duration: 0.09
+  }, 0.14);
+
+  /* ---- Flourish divider fades in ---- */
+  tl.to('.flourish', {
+    opacity: 1,
+    ease: 'power1.out',
+    duration: 0.05
+  }, 0.22);
+
+  /* ---- Date rises in ---- */
+  tl.to('.date', {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    ease: 'power2.out',
+    duration: 0.07
+  }, 0.28);
+
+  /* ---- Place tracks in from wide letter-spacing ---- */
+  tl.to('.place', {
+    opacity: 0.86,
+    letterSpacing: '0.32em',
+    y: 0,
+    ease: 'power2.out',
+    duration: 0.07
+  }, 0.34);
+
+  // All text is fully settled by ~0.41; the rest of the villa journey
+  // is the continued zoom with the copy already in place.
+
+  /* ---- CLOSING BEAT: villa scene dissolves into the couple photo ----
+     Villa layer, sparkles, and every text element fade out together;
+     the couple photo fades in underneath. Positioning them all at the
+     same start (1.05) with the same duration (0.25) means they cross
+     at the midpoint rather than one finishing before the other starts,
+     which is what makes it read as a single dissolve rather than two
+     separate fades. */
+  tl.to('.layer-villa', { opacity: 0, ease: 'power1.inOut', duration: 0.25 }, 1.05)
+    .to('.layer-couple', { opacity: 1, ease: 'power1.inOut', duration: 0.25 }, 1.05)
+    .to(['.headline', '.eyebrow', '.flourish', '.date', '.place'], {
+      opacity: 0,
+      ease: 'power1.inOut',
+      duration: 0.2
+    }, 1.05)
+    .to('.birds-wrap', { opacity: 0, ease: 'power1.inOut', duration: 0.15 }, 1.05);
+}
+</script>
+
+</body>
+</html>
