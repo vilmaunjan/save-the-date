@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Love Letter — Edgar &amp; Vilma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Cinzel&family=Mrs+Saint+Delafield&display=swap" rel="stylesheet">
+<style>
+/* ---- TOKENS (same palette as index.html, for continuity) ---- */
+:root {
+  --parchment: #F7F1E4;
+  --clay:      #C97C5D;
+  --stone:     #E6C79A;
+  --sage:      #6C7C58;
+  --sky:       #AFC9D6;
+  --ink:       #3B322A;
+  --gold:      #B8912F;
+  /* Sampled directly from envelope.jpeg's own background border
+     (averaged a handful of corner/edge pixels — landed on ~#EDE4DB
+     consistently), so anything showing through around the envelope
+     matches its paper color exactly instead of visibly seaming into
+     the page's own (slightly different) sky/parchment tones. */
+  --envelope-cream: #EDE4DB;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* background: matches body, as a fallback behind the page.
+   overscroll-behavior-y: none disables the browser's elastic bounce/
+   rubber-band effect at the top/bottom of the scrollable range on
+   trackpad/touch — that bounce is what was briefly exposing a gap
+   behind the sky-scene, no matter what color sits behind it. Removing
+   the bounce removes the gap entirely. */
+html {
+  height: 100%;
+  background: var(--parchment);
+  overscroll-behavior-y: none;
+}
+
+body {
+  min-height: 100%;
+  font-family: 'EB Garamond', serif;
+  color: var(--ink);
+  background: var(--parchment);
+  overscroll-behavior-y: none;
+  /* Locked (no scroll) during the envelope intro — there's nothing to
+     scroll to yet anyway, but this keeps it explicit. Unlocked by JS
+     once the click reveal finishes, so scrolling down through
+     .scroll-spacer fades the couple photo in behind the sky-scene text. */
+  overflow: hidden;
+}
+body.unlocked { overflow: auto; }
+
+/* ---- STAGE: fills the first viewport (envelope intro + sky-scene reveal) ---- */
+.stage {
+  /* sticky, not relative — stays pinned at the top of the viewport as
+     you scroll, same pattern as .viewport-pin on the main site, instead
+     of scrolling away together with the photo underneath it. */
+  position: sticky;
+  top: 0;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  cursor: pointer; /* hints the whole screen is clickable, matching "Open the invitation" */
+}
+
+/* Sky/parchment backdrop behind the envelope — the envelope's own
+   background is genuinely transparent now (chroma-keyed out of the
+   original photo's black backdrop), so this shows through wherever
+   `cover` sizing doesn't have envelope pixels to show (i.e. barely
+   anywhere, but it's there for any edge case). */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  /* Was a sky-to-parchment gradient — but this is specifically what
+     shows through around/behind the envelope (its own gaps on desktop
+     `cover`, and the letterboxed edges on mobile `contain`), so a flat
+     match to the envelope's own paper color reads as one continuous
+     surface instead of the envelope visibly sitting on top of a
+     different-colored page. */
+  background: var(--envelope-cream);
+}
+
+/* ---- SKY SCENE — revealed on click ----
+   Sits behind the envelope in the DOM (so it stacks underneath with no
+   z-index needed) and starts fully transparent. A click fades the
+   envelope out and this in together, revealing open sky with birds.
+   Same gradient tokens and bird line-art as the finished index.html
+   site, for visual continuity between the two pieces. */
+.sky-scene {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+.sky-scene .sky-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, var(--sky) 0%, var(--parchment) 65%);
+}
+
+/* Couple photo, now living behind the monogram/"Save the date" text
+   instead of a separate flat section — this is the "blend" the sky-bg
+   gradient alone couldn't give. Sits on top of .sky-bg (covers it
+   entirely with `cover` sizing, so the gradient is just a fallback for
+   any edge the photo doesn't reach) and underneath the scrim + text,
+   per DOM order. */
+.sky-scene .sky-photo {
+  position: absolute;
+  /* top:-30px (not inset:0's top:0) is the actual fix for the hard top
+     edge — the box now starts 30px above the container, well past the
+     20px it ever gets shifted down by the translateY animation below.
+     So at every point in that animation, its rendered top edge stays at
+     or above y=0: -30+20=-10px at the very start, -30+0=-30px at rest.
+     It never dips below 0, which means it never opens a gap that
+     exposes .sky-bg's flat blue underneath — that exposed-gap, not the
+     photo's own edge, was the actual hard line (masking the photo's own
+     top, tried earlier, did nothing because the photo's box — mask
+     included — was sliding down as a whole, gap and all, along with it).
+     .stage's overflow:hidden clips the 30px overextension itself, so
+     nothing spills past the visible screen. */
+  top: -30px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('couple-2.webp');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center 30%;
+  /* Starts hidden even once .sky-scene itself is fully visible after the
+     click — this and .sky-scrim fade in together on scroll (see the
+     ScrollTrigger below), not immediately on click. Opacity here
+     compounds with .sky-scene's own opacity, so it stays invisible
+     until both are true. Also starts nudged down slightly, rising into
+     place as it fades — a small "coming from below" touch rather than
+     just a flat crossfade. */
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+/* Parchment-tinted wash over the photo so the ink-colored monogram and
+   "Save the date" text stay legible against a busy image — heavier
+   behind the monogram/tagline near the top, easing off through the
+   middle so the photo still reads as a photo, not just a texture. */
+.sky-scene .sky-scrim {
+  position: absolute;
+  /* Same overextended top as .sky-photo, same reason — keeps this from
+     opening its own gap above the photo while it's rising into place. */
+  top: -30px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(247, 241, 228, 0.78) 0%,
+    rgba(247, 241, 228, 0.5) 32%,
+    rgba(247, 241, 228, 0.38) 60%,
+    rgba(247, 241, 228, 0.62) 100%
+  );
+  /* Fades in together with .sky-photo — no scrim needed while there's no
+     photo underneath it yet. Same slight rise, so the two move as one
+     rather than the scrim staying static while the photo shifts under
+     it. */
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+/* Pure scroll room — no content of its own. Gives the (sticky-pinned)
+   .stage something to scroll against so .sky-photo/.sky-scrim have a
+   scroll distance to fade across. Replaces the old separate full-photo
+   section below; the photo now lives up in the sky-scene itself. */
+.scroll-spacer {
+  /* Must match .stage's unit (100dvh, not 100vh) — dvh resizes with the
+     mobile browser's address bar as it shows/hides, vh doesn't. If the
+     two disagree at page load, this spacer's top edge lands somewhere
+     other than a full screen's worth of scroll below .stage, so the
+     ScrollTrigger fade below reads its "start" point as already passed
+     before you've scrolled anything. */
+  height: 100dvh;
+}
+
+/* A small "scroll for more" cue at the bottom of the sky scene, fading
+   in with everything else — scrolling is what fades the couple photo in
+   behind the monogram/text, so this hints that there's more to see. */
+.scroll-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6vh;
+  text-align: center;
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: clamp(0.72rem, 1.6vw, 0.85rem);
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  color: var(--ink);
+  opacity: 0.55;
+}
+
+.bird {
+  position: absolute;
+  width: 26px;
+  height: auto;
+  opacity: 0;
+  pointer-events: none;
+}
+.bird svg { width: 100%; height: 100%; display: block; }
+.bird-a { top: 18%; animation: flyA 19s linear infinite; animation-delay: 0.5s; }
+.bird-b { top: 26%; width: 19px; animation: flyB 23s linear infinite; animation-delay: 4s; }
+.bird-c { top: 12%; width: 16px; animation: flyA 27s linear infinite; animation-delay: 8s; }
+@keyframes flyA {
+  0%   { left: -5%;  opacity: 0; }
+  5%   { opacity: 0.6; }
+  95%  { opacity: 0.6; }
+  100% { left: 106%; opacity: 0; }
+}
+@keyframes flyB {
+  0%   { left: 110%; opacity: 0; }
+  5%   { opacity: 0.42; }
+  95%  { opacity: 0.42; }
+  100% { left: -6%;  opacity: 0; }
+}
+
+/* ---- MONOGRAM — the sky scene's centerpiece ----
+   E and V as two large serif letters, deliberately overlapping rather
+   than sitting side by side — the classic engraved-crest look, like the
+   wax seal on the envelope but scaled up into the focal element of this
+   scene. V sits in front (higher in the DOM = on top with no z-index
+   needed) so its shape naturally cuts across E where they intersect,
+   the way two overlapping letters actually look engraved/pressed
+   together rather than just stacked. */
+.monogram {
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  transform: translate(-50%, -50%);
+  width: clamp(95px, 18vw, 160px);
+  aspect-ratio: 1 / 1;
+  pointer-events: none;
+}
+.monogram .mono-letter {
+  position: absolute;
+  top: 50%;
+  /* Cinzel: geometric, evenly-weighted Roman capitals — the classic
+     engraved/wax-seal monogram look, distinct on purpose from the
+     Cormorant Garamond used everywhere else on this page; monograms
+     traditionally get their own dedicated display face. */
+  font-family: 'Cinzel', serif;
+  line-height: 1;
+  font-size: clamp(2.6rem, 8vw, 4.8rem);
+  /* Same ink color as the rest of the text now, for consistency —
+     was gold. */
+  color: var(--ink);
+}
+.mono-e {
+  left: 42%;
+  transform: translate(-50%, -50%);
+}
+.mono-v {
+  left: 58%;
+  /* Same top as E (50%, inherited) — the drop comes from the extra
+     translateY below, sized off the letter's own font-size rather than
+     the small monogram box's percentage height, so it scales correctly
+     at any screen size. Was 0.5em, then 0.35em, eased back once more. */
+  transform: translate(-50%, -50%) translateY(0.22em);
+}
+
+/* ---- SAVE-THE-DATE BLOCK — below the monogram, same scene ----
+   Matches the font/spacing pattern from the reference: a loose cursive
+   tagline, then a tracked-out serif caps date, then bigger tracked-out
+   serif caps names. No separate reveal animation — rides along with
+   .sky-scene's own opacity fade, same as the monogram and birds. */
+.save-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 36%;
+  text-align: center;
+}
+
+.save-tagline {
+  font-family: 'Mrs Saint Delafield', cursive;
+  font-size: clamp(4.4rem, 14vw, 7.4rem);
+  line-height: 1;
+  color: var(--ink);
+  margin-bottom: 0.5em;
+}
+
+.save-date {
+  font-family: 'EB Garamond', serif;
+  font-weight: 500;
+  font-size: clamp(1.1rem, 2.8vw, 1.5rem);
+  text-transform: uppercase;
+  letter-spacing: 0.38em;
+  color: var(--ink);
+  opacity: 0.8;
+  /* nudge right to visually re-center against the letter-spacing,
+     which otherwise pushes the whole line slightly left */
+  padding-left: 0.38em;
+}
+
+/* Full-bleed envelope, filling the entire screen edge-to-edge.
+   cover (not contain) per "make it fit the whole screen" — this crops
+   rather than letterboxes. This version of envelope.jpeg already has a
+   soft cream backdrop (no chroma-key needed like the first version did),
+   which reads as a continuation of the page's own parchment tone rather
+   than a hard edge. background-position biased slightly above center
+   keeps the wax seal and scalloped flap comfortably in frame even when
+   a narrow phone screen crops the sides more aggressively than a wide
+   desktop window would. */
+.envelope-photo {
+  position: absolute;
+  inset: 0;
+  background-image: url('envelope.jpeg');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center 42%;
+  opacity: 0;
+  transform: scale(1.02);
+}
+
+/* ---- "Open the invitation" — bottom of the screen ---- */
+.open-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8vh;
+  text-align: center;
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(0.85rem, 2.2vw, 1.15rem);
+  text-transform: uppercase;
+  letter-spacing: 0.42em;
+  color: var(--ink);
+  opacity: 0;
+  z-index: 2;
+}
+
+/* ---- "A Love letter from / Edgar & Vilma" — top of the screen ---- */
+.from-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12vh;
+  text-align: center;
+  z-index: 2;
+}
+
+.from-eyebrow {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(0.72rem, 1.8vw, 0.92rem);
+  text-transform: uppercase;
+  letter-spacing: 0.34em;
+  color: var(--ink);
+  /* More separation from the names below — was 0.35em, then 1.1em, then 2em. */
+  margin-bottom: 2.6em;
+  opacity: 0;
+}
+
+.from-names {
+  /* Same font as "Save the date" in the sky scene, for consistency
+     between the two cursive moments on the page. */
+  font-family: 'Mrs Saint Delafield', cursive;
+  font-size: clamp(2.8rem, 8vw, 4.6rem);
+  line-height: 1;
+  color: var(--ink);
+  margin-top: 0.9em;
+  /* No opacity/transition here anymore — each .letter span inside
+     handles its own reveal now (see the per-letter stagger below), so
+     the container itself just needs to be visible from the start. */
+}
+
+/* Each character of "Edgar & Vilma" is its own inline-block span so
+   GSAP can stagger them in one at a time, like the name being written
+   one letter at a time. */
+.from-names .letter {
+  display: inline-block;
+  opacity: 0;
+}
+
+/* ---- MOBILE ---- */
+@media (max-width: 480px) {
+  .open-line  { bottom: 6vh; letter-spacing: 0.3em; }
+  .from-block { top: 9vh; }
+  .save-block { top: 33%; }
+  /* cover forces a wide envelope photo to fill a tall, narrow phone
+     screen by blowing it up until the height fits, then cropping hard
+     off both sides — background-position can only bias where that crop
+     lands, not stop it. contain shows the whole envelope uncropped
+     instead, letterboxed by .backdrop (already sitting behind it) —
+     now a flat match to the envelope's own paper color, so the
+     letterboxed strip reads as more envelope, not empty page. */
+  .envelope-photo { background-size: contain; }
+}
+
+/* ---- REDUCED MOTION: everything visible immediately, no animation ---- */
+@media (prefers-reduced-motion: reduce) {
+  .envelope-photo,
+  .open-line,
+  .from-eyebrow,
+  .from-names .letter,
+  .sky-photo,
+  .sky-scrim {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="backdrop"></div>
+
+  <!-- Revealed on click: sky + birds behind the envelope -->
+  <div class="sky-scene" aria-hidden="true">
+    <div class="sky-bg"></div>
+    <div class="sky-photo" role="img" aria-label="Edgar and Vilma on the beach"></div>
+    <div class="sky-scrim"></div>
+    <div class="bird bird-a"><svg viewBox="0 0 24 12" fill="none"><path d="M1 8C4 3 8 3 12 7C16 3 20 3 23 8" stroke="#5A4A38" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+    <div class="bird bird-b"><svg viewBox="0 0 24 12" fill="none"><path d="M1 8C4 3 8 3 12 7C16 3 20 3 23 8" stroke="#5A4A38" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+    <div class="bird bird-c"><svg viewBox="0 0 24 12" fill="none"><path d="M1 8C4 3 8 3 12 7C16 3 20 3 23 8" stroke="#5A4A38" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+
+    <!-- Monogram: E behind, V in front (DOM order = stacking order) -->
+    <div class="monogram" aria-label="Edgar and Vilma monogram">
+      <span class="mono-letter mono-e">E</span>
+      <span class="mono-letter mono-v">V</span>
+    </div>
+
+    <div class="save-block">
+      <div class="save-tagline">Save the date</div>
+      <div class="save-date">April 30th, 2027</div>
+    </div>
+
+    <div class="scroll-hint">Scroll for more</div>
+  </div>
+
+  <div class="envelope-photo" role="img" aria-label="Cream wedding invitation envelope with a wax seal monogrammed E and V"></div>
+
+  <div class="open-line">Open the invitation</div>
+
+  <div class="from-block">
+    <div class="from-eyebrow">A Love letter from</div>
+    <!-- Each character wrapped for the per-letter "writing" reveal (see
+         JS below). aria-label carries the real accessible text so screen
+         readers say "Edgar & Vilma" as a phrase, not letter by letter. -->
+    <div class="from-names" aria-label="Edgar &amp; Vilma"
+      ><span class="letter" aria-hidden="true">E</span
+      ><span class="letter" aria-hidden="true">d</span
+      ><span class="letter" aria-hidden="true">g</span
+      ><span class="letter" aria-hidden="true">a</span
+      ><span class="letter" aria-hidden="true">r</span
+      ><span class="letter" aria-hidden="true">&nbsp;</span
+      ><span class="letter" aria-hidden="true">&amp;</span
+      ><span class="letter" aria-hidden="true">&nbsp;</span
+      ><span class="letter" aria-hidden="true">V</span
+      ><span class="letter" aria-hidden="true">i</span
+      ><span class="letter" aria-hidden="true">l</span
+      ><span class="letter" aria-hidden="true">m</span
+      ><span class="letter" aria-hidden="true">a</span
+    ></div>
+  </div>
+</div>
+
+<!-- No visible content — just scroll room so the sticky-pinned .stage
+     has something to scroll against, driving the sky-photo/scrim fade
+     below (see the script). -->
+<div class="scroll-spacer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+// Declared out here (not with const inside the block below) so the click
+// handler further down can reach in and kill it if the envelope gets
+// clicked before the intro sequence finishes playing.
+let introTl;
+
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  // The couple photo (and its legibility scrim) now lives behind the
+  // monogram/"Save the date" text inside .sky-scene, starting invisible
+  // even after the envelope-click reveal. It only fades in once you
+  // scroll — tied to .scroll-spacer, the plain, contentless block right
+  // after .stage that exists purely to give the sticky-pinned .stage
+  // some distance to scroll against. As you scroll through that 100dvh,
+  // the photo eases in behind the still-pinned text instead of the
+  // photo just being "there" the instant the envelope opens.
+  gsap.to('.sky-photo, .sky-scrim', {
+    opacity: 1,
+    y: 0,
+    ease: 'none',
+    scrollTrigger: {
+      trigger: '.scroll-spacer',
+      start: 'top bottom',
+      end: 'top 20%',
+      scrub: 0.3
+    }
+  });
+
+  /*
+    Simple page-load sequence (no scroll yet — first beat of what will
+    grow into a longer scroll-driven piece later):
+
+      0.0s          envelope fades/settles in, full-bleed
+      ~0.7s         "Open the invitation" fades in at the bottom
+      ~0.9s         "A Love letter from" fades in at the top
+      ~1.15s        "Edgar & Vilma" writes itself in one letter at a
+                    time, like a signature
+
+    "A Love letter from" no longer waits for "Open the invitation" to
+    fully finish (that was 1.6s in) — it starts sooner now, overlapping
+    the tail end of that reveal instead of queuing strictly after it.
+    Assigned to `introTl` (not a bare const) so the click handler below
+    can kill it outright.
+  */
+  introTl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+
+  introTl.to('.envelope-photo', { opacity: 1, scale: 1, duration: 1.1 }, 0)
+    .to('.open-line', { opacity: 1, y: 0, duration: 0.9 }, 0.7)
+    .to('.from-eyebrow', { opacity: 1, duration: 0.7 }, 0.9)
+    // Per-letter "writing" reveal — each character of "Edgar & Vilma"
+    // fades in on its own, staggered, rather than the whole name
+    // appearing at once.
+    .to('.from-names .letter', {
+      opacity: 1,
+      duration: 0.35,
+      stagger: 0.055,
+      ease: 'power1.out'
+    }, 1.15);
+}
+
+/* ---- CLICK: envelope fades out, sky + birds fade in ----
+   Works regardless of reduced-motion (the intro sequence above is
+   gated, this isn't) — reduced-motion users just get an instant swap
+   (duration 0) instead of an animated crossfade. Guarded with `opened`
+   so a second click can't restart/stack the transition. */
+let opened = false;
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function startEnvelopeTransition() {
+  const d = reduceMotion ? 0 : 1;
+  gsap.timeline()
+    .to(['.envelope-photo', '.open-line', '.from-eyebrow', '.from-names .letter'], {
+      opacity: 0,
+      duration: d,
+      ease: 'power1.inOut'
+    }, 0)
+    .to('.sky-scene', {
+      opacity: 1,
+      duration: reduceMotion ? 0 : 1.2,
+      ease: 'power1.inOut',
+      // Unlock scrolling once the reveal has actually finished, not
+      // before — scrolling mid-transition would fight the animation.
+      onComplete: () => document.body.classList.add('unlocked')
+    }, reduceMotion ? 0 : 0.15);
+}
+
+document.querySelector('.stage').addEventListener('click', () => {
+  if (opened) return;
+  opened = true;
+
+  // Was the intro already finished before this click, or did we just
+  // force it to the end? Matters for pacing below — checked BEFORE
+  // calling progress(1), which would otherwise always report 1.
+  const introWasAlreadyDone = !introTl || introTl.progress() >= 0.999;
+
+  // If the intro is still mid-flight (e.g. "Edgar & Vilma" hasn't
+  // finished writing itself in yet), snap it to its completed state
+  // instantly rather than cutting it off mid-reveal — progress(1) jumps
+  // every queued tween straight to its end value in one synchronous
+  // step, so envelope/eyebrow/every letter land at fully visible right
+  // now. kill() afterward fully removes it so nothing keeps ticking.
+  if (introTl) {
+    introTl.progress(1);
+    introTl.kill();
+  }
+
+  if (introWasAlreadyDone) {
+    // Nothing was force-completed — the click should feel instant, not
+    // laggy, so no artificial pause here.
+    startEnvelopeTransition();
+  } else {
+    // We just snapped straight to "Edgar & Vilma" fully written in —
+    // give that a beat to actually register before it dissolves away,
+    // rather than the two happening back to back in the same instant.
+    // This delay ONLY applies to this early-click case, on purpose.
+    setTimeout(startEnvelopeTransition, reduceMotion ? 0 : 550);
+  }
+});
+</script>
+
+</body>
+</html>
