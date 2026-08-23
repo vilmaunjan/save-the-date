@@ -50,8 +50,16 @@ body {
      once the click reveal finishes, so scrolling down through
      .scroll-spacer fades the couple photo in behind the sky-scene text. */
   overflow: hidden;
+  /* Hidden until JS confirms the scroll position is actually 0 and
+     reveals it (see the script) — the browser can restore a previous
+     scroll position and paint that frame before our own JS gets a
+     chance to correct it, which is exactly the "flash mid-scroll, then
+     jump to top" you were seeing. Hiding first means there's nothing to
+     flash regardless of how that timing race plays out. */
+  visibility: hidden;
 }
 body.unlocked { overflow: auto; }
+body.revealed { visibility: visible; }
 
 /* ---- STAGE: fills the first viewport (envelope intro + sky-scene reveal) ---- */
 .stage {
@@ -108,19 +116,22 @@ body.unlocked { overflow: auto; }
    per DOM order. */
 .sky-scene .sky-photo {
   position: absolute;
-  /* top:-30px (not inset:0's top:0) is the actual fix for the hard top
-     edge — the box now starts 30px above the container, well past the
-     20px it ever gets shifted down by the translateY animation below.
+  /* top:-100px (not inset:0's top:0) is the actual fix for the hard top
+     edge — the box now starts 100px above the container, well past the
+     70px it ever gets shifted down by the translateY animation below.
      So at every point in that animation, its rendered top edge stays at
-     or above y=0: -30+20=-10px at the very start, -30+0=-30px at rest.
-     It never dips below 0, which means it never opens a gap that
+     or above y=0: -100+70=-30px at the very start, -100+0=-100px at
+     rest. It never dips below 0, which means it never opens a gap that
      exposes .sky-bg's flat blue underneath — that exposed-gap, not the
      photo's own edge, was the actual hard line (masking the photo's own
      top, tried earlier, did nothing because the photo's box — mask
      included — was sliding down as a whole, gap and all, along with it).
-     .stage's overflow:hidden clips the 30px overextension itself, so
-     nothing spills past the visible screen. */
-  top: -30px;
+     (70px, up from 20px, so it starts noticeably lower/further down
+     before rising in — the overextension above had to grow to match, to
+     keep the same never-reveals-a-gap guarantee.) .stage's
+     overflow:hidden clips the overextension itself, so nothing spills
+     past the visible screen. */
+  top: -100px;
   left: 0;
   right: 0;
   bottom: 0;
@@ -136,7 +147,22 @@ body.unlocked { overflow: auto; }
      place as it fades — a small "coming from below" touch rather than
      just a flat crossfade. */
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(70px);
+  /* Dissolve-wipe for the exit (see the JS timeline): --wipe is a plain
+     percentage GSAP animates directly. The mask is fully opaque (black)
+     everywhere until --wipe rises above 0, at which point the region
+     from the RIGHT edge up to --wipe becomes transparent — "to left"
+     means the gradient's 0% stop sits at the right edge, 100% at the
+     left, so growing --wipe erases right-to-left. The ~20-point gap
+     between the two transparent/black stops is the feather: a soft,
+     gradual dissolve rather than a hard-edged wipe. blur grows in the
+     same tween, so what's left as it erases also softens instead of
+     staying crisply defined right up until it disappears — together
+     these read as falling apart, not sliding away.  */
+  --wipe: 0%;
+  -webkit-mask-image: linear-gradient(to left, transparent 0%, transparent var(--wipe), black calc(var(--wipe) + 22%), black 100%);
+  mask-image: linear-gradient(to left, transparent 0%, transparent var(--wipe), black calc(var(--wipe) + 22%), black 100%);
+  filter: blur(0px);
 }
 
 /* Parchment-tinted wash over the photo so the ink-colored monogram and
@@ -145,9 +171,10 @@ body.unlocked { overflow: auto; }
    middle so the photo still reads as a photo, not just a texture. */
 .sky-scene .sky-scrim {
   position: absolute;
-  /* Same overextended top as .sky-photo, same reason — keeps this from
-     opening its own gap above the photo while it's rising into place. */
-  top: -30px;
+  /* Same overextended top as .sky-photo (now -100px, matching its 70px
+     rise), same reason — keeps this from opening its own gap above the
+     photo while it's rising into place. */
+  top: -100px;
   left: 0;
   right: 0;
   bottom: 0;
@@ -159,17 +186,31 @@ body.unlocked { overflow: auto; }
     rgba(247, 241, 228, 0.62) 100%
   );
   /* Fades in together with .sky-photo — no scrim needed while there's no
-     photo underneath it yet. Same slight rise, so the two move as one
-     rather than the scrim staying static while the photo shifts under
-     it. */
+     photo underneath it yet. Same rise (70px, up from 20px, so it starts
+     further down the screen), so the two move as one rather than the
+     scrim staying static while the photo shifts under it. Same
+     dissolve-wipe treatment as .sky-photo, in sync, so the scrim doesn't
+     linger as a flat rectangle after the photo underneath it has already
+     dissolved away. */
   opacity: 0;
-  transform: translateY(20px);
+  transform: translateY(70px);
+  --wipe: 0%;
+  -webkit-mask-image: linear-gradient(to left, transparent 0%, transparent var(--wipe), black calc(var(--wipe) + 22%), black 100%);
+  mask-image: linear-gradient(to left, transparent 0%, transparent var(--wipe), black calc(var(--wipe) + 22%), black 100%);
+  filter: blur(0px);
 }
 
 /* Pure scroll room — no content of its own. Gives the (sticky-pinned)
-   .stage something to scroll against so .sky-photo/.sky-scrim have a
-   scroll distance to fade across. Replaces the old separate full-photo
-   section below; the photo now lives up in the sky-scene itself. */
+   .stage something to scroll against so everything below has a scroll
+   distance to animate across: couple fade-in, a hold, couple-exits/
+   villa-enters together, villa's continued push-in, then the caption.
+   All of it now lives inside the ONE .stage/.scroll-spacer pair — the
+   couple photo and villa used to be two separate pinned scenes handed
+   off sequentially, but that meant they could never be on screen at
+   the same time, which is what "villa starts appearing as the couple
+   starts exiting" actually requires. Taller than the single-beat
+   100dvh it used to be (this now covers five choreographed beats
+   instead of one), so .stage stays pinned that much longer too. */
 .scroll-spacer {
   /* Must match .stage's unit (100dvh, not 100vh) — dvh resizes with the
      mobile browser's address bar as it shows/hides, vh doesn't. If the
@@ -177,7 +218,62 @@ body.unlocked { overflow: auto; }
      other than a full screen's worth of scroll below .stage, so the
      ScrollTrigger fade below reads its "start" point as already passed
      before you've scrolled anything. */
-  height: 100dvh;
+  /* 210dvh, up from 170dvh — elongates the whole sequence below (more
+     scroll distance per beat, plus a new beat: the text sliding left as
+     the villa enters), so it reads as slower/more gradual, not just
+     stretched-thin over the same distance. */
+  height: 210dvh;
+}
+
+/* ---- VILLA — now a layer inside .stage, not its own scene ----
+   villa-cutout.webp: same transparent cutout villa.html uses. Used to
+   be a full inset:0 box filling the whole stage; now a much smaller,
+   deliberately sized box (42vw, capped at 380px, square to match the
+   source image's actual 1024x1024 dimensions) anchored near the right
+   edge (right: 6vw) instead — "smaller" and "final spot on the right"
+   are really the same change: the box's resting size/position IS its
+   final spot, everything else is just animated relative to that. No
+   backdrop of its own — .stage's own background shows through
+   (parchment, since .backdrop is the envelope-cream color and .sky-bg's
+   gradient has long since faded to parchment by the time this is
+   visible), rather than the sky-to-parchment gradient used earlier in
+   the scene. */
+.villa-image {
+  position: absolute;
+  top: 50%;
+  right: 6vw;
+  /* Was 42vw/380px, then 48vw/430px — bumped up more this time. */
+  width: 60vw;
+  max-width: 540px;
+  aspect-ratio: 1 / 1;
+  background-image: url('villa-cutout.webp');
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center center;
+  filter: drop-shadow(0 18px 34px rgba(30, 20, 10, 0.22));
+  transform-origin: 50% 60%;
+  /* translateY(-50%) is baseline vertical centering (top:50% + this).
+     translateX(150%) starts it well off-screen to the right of its own
+     resting spot (right: 6vw) — the slide-in tween below animates x
+     down to 0, which is what actually lands it at that resting
+     position. GSAP tracks translateX/Y as independent components, so
+     animating x alone doesn't disturb the y centering. */
+  transform: translateY(-50%) translateX(150%);
+}
+.villa-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 14vh;
+  text-align: center;
+  font-family: 'EB Garamond', serif;
+  font-weight: 600;
+  font-size: clamp(1rem, 2.6vw, 1.35rem);
+  text-transform: uppercase;
+  letter-spacing: 0.4em;
+  color: var(--ink);
+  opacity: 0;
+  padding-left: 0.4em;
 }
 
 /* A small "scroll for more" cue at the bottom of the sky scene, fading
@@ -384,7 +480,15 @@ body.unlocked { overflow: auto; }
 
 /* ---- MOBILE ---- */
 @media (max-width: 480px) {
-  .open-line  { bottom: 6vh; letter-spacing: 0.3em; }
+  /* Was bottom:6vh — on mobile, .envelope-photo switches to
+     background-size:contain (see below), which no longer fills the
+     screen edge-to-edge, so the envelope's actual bottom edge sits well
+     above the screen's bottom edge. 20dvh roughly splits the difference
+     between the two instead of pinning tight to the bottom, which used
+     to leave a big empty gap above the text and cram it too close to
+     the edge. dvh (not vh), matching .stage, so this doesn't drift on
+     phones where the address bar changes the viewport height. */
+  .open-line  { bottom: 20dvh; letter-spacing: 0.3em; }
   .from-block { top: 9vh; }
   .save-block { top: 33%; }
   /* cover forces a wide envelope photo to fill a tall, narrow phone
@@ -395,6 +499,33 @@ body.unlocked { overflow: auto; }
      now a flat match to the envelope's own paper color, so the
      letterboxed strip reads as more envelope, not empty page. */
   .envelope-photo { background-size: contain; }
+
+  /* Side-by-side (villa right, text center-ish) works on desktop
+     because there's enough width for both — on a narrow phone, villa's
+     size (60vw of a much smaller screen) collides with the text
+     instead. Moving it down and centering it horizontally puts it
+     BELOW the text rather than beside it, at this width only; desktop
+     keeps the original right:6vw/top:50% side-by-side layout untouched.
+     left:0/right:0/margin:auto (not a transform-based x-offset) is what
+     actually centers it — GSAP's x tween ends at exactly 0%, so the
+     resting position has to already BE centered with zero extra x
+     applied, which margin:auto gives for free without needing a
+     compensating transform value. transform here only handles vertical
+     centering (translateY) plus the same 150% off-screen starting
+     offset as desktop — GSAP's x tween still slides it in from the
+     right, it just lands lower and centered instead of at the right
+     edge, mid-height. */
+  .villa-image {
+    /* Was 82% — too far down, sitting close to (or past) the bottom of
+       the screen. 66% instead. */
+    top: 66%;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    transform: translateY(-50%) translateX(150%);
+    width: 62vw;
+    max-width: none;
+  }
 }
 
 /* ---- REDUCED MOTION: everything visible immediately, no animation ---- */
@@ -408,10 +539,22 @@ body.unlocked { overflow: auto; }
     opacity: 1 !important;
     transform: none !important;
   }
+  /* Villa now lives in the SAME .stage as the couple photo/monogram —
+     without the scroll-driven animation (skipped entirely for reduced
+     motion), both would end up permanently visible and overlapping in
+     the same spot. Simplest safe fallback: keep the couple/monogram/
+     date scene exactly as it already worked, and leave the villa
+     hidden entirely for reduced-motion users rather than risk a broken
+     overlap. */
+  .villa-caption,
+  .villa-image {
+    opacity: 0 !important;
+  }
 }
 </style>
 </head>
 <body>
+<noscript><style>body { visibility: visible !important; }</style></noscript>
 
 <div class="stage">
   <div class="backdrop"></div>
@@ -421,6 +564,14 @@ body.unlocked { overflow: auto; }
     <div class="sky-bg"></div>
     <div class="sky-photo" role="img" aria-label="Edgar and Vilma on the beach"></div>
     <div class="sky-scrim"></div>
+
+    <!-- Villa lives here, not after .sky-scene — DOM order is stacking
+         order, so this puts it above the couple photo/scrim (which it's
+         replacing) but still BELOW the monogram/save-block text right
+         below, so that text stays legible on top of it as it slides in
+         instead of getting covered. -->
+    <div class="villa-image" role="img" aria-label="Watercolor illustration of the Tuscan-style villa"></div>
+
     <div class="bird bird-a"><svg viewBox="0 0 24 12" fill="none"><path d="M1 8C4 3 8 3 12 7C16 3 20 3 23 8" stroke="#5A4A38" stroke-width="1.4" stroke-linecap="round"/></svg></div>
     <div class="bird bird-b"><svg viewBox="0 0 24 12" fill="none"><path d="M1 8C4 3 8 3 12 7C16 3 20 3 23 8" stroke="#5A4A38" stroke-width="1.4" stroke-linecap="round"/></svg></div>
     <div class="bird bird-c"><svg viewBox="0 0 24 12" fill="none"><path d="M1 8C4 3 8 3 12 7C16 3 20 3 23 8" stroke="#5A4A38" stroke-width="1.4" stroke-linecap="round"/></svg></div>
@@ -464,16 +615,53 @@ body.unlocked { overflow: auto; }
       ><span class="letter" aria-hidden="true">a</span
     ></div>
   </div>
+
+  <!-- Caption stays up here, on top of everything (including the
+       monogram/save-block) — unlike .villa-image, there's no text
+       underneath it competing for legibility. -->
+  <div class="villa-caption">Orlando, FL, USA</div>
 </div>
 
 <!-- No visible content — just scroll room so the sticky-pinned .stage
-     has something to scroll against, driving the sky-photo/scrim fade
-     below (see the script). -->
+     has something to scroll against, driving everything animated
+     inside it (see the script). -->
 <div class="scroll-spacer"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script>
+// Browsers restore the previous scroll position on reload by default —
+// with .stage's sticky-pinned choreography, landing mid-scroll on
+// reload means the couple photo/villa/text are already partway (or all
+// the way) through their transition even though you're looking at what
+// should be the very first envelope screen. 'manual' stops the browser
+// from doing that; the explicit scrollTo(0,0) is a belt-and-suspenders
+// second guarantee in case scrollRestoration alone doesn't run in time
+// on a given browser.
+if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+}
+window.scrollTo(0, 0);
+
+// body starts visibility:hidden (see the CSS) specifically so this
+// race can't produce a visible flash: the browser can restore a
+// previous scroll position and paint that frame before this script has
+// even run, no matter how early we call scrollTo. Instead of trying to
+// out-race that, we wait it out — two rAFs give the browser's own
+// restoration a couple of paint cycles to do whatever it's going to do
+// — force scroll to 0 one last time after that, THEN reveal. Nothing
+// gets shown to you until we're actually sure it's correct.
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    window.scrollTo(0, 0);
+    document.body.classList.add('revealed');
+  });
+});
+// Safety net: if anything above throws or a browser quirk stops the
+// rAF chain from ever firing, don't leave the page permanently
+// invisible — reveal it regardless after a short timeout.
+setTimeout(() => document.body.classList.add('revealed'), 800);
+
 // Declared out here (not with const inside the block below) so the click
 // handler further down can reach in and kill it if the envelope gets
 // clicked before the intro sequence finishes playing.
@@ -483,25 +671,70 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
 
   gsap.registerPlugin(ScrollTrigger);
 
-  // The couple photo (and its legibility scrim) now lives behind the
-  // monogram/"Save the date" text inside .sky-scene, starting invisible
-  // even after the envelope-click reveal. It only fades in once you
-  // scroll — tied to .scroll-spacer, the plain, contentless block right
-  // after .stage that exists purely to give the sticky-pinned .stage
-  // some distance to scroll against. As you scroll through that 100dvh,
-  // the photo eases in behind the still-pinned text instead of the
-  // photo just being "there" the instant the envelope opens.
-  gsap.to('.sky-photo, .sky-scrim', {
-    opacity: 1,
-    y: 0,
-    ease: 'none',
+  // ONE master timeline, one shared ScrollTrigger spanning the entire
+  // .scroll-spacer, choreographing six beats in order (elongated from
+  // the previous version — longer fade-in since the couple now rises
+  // from further down, and a longer hold/transition/zoom generally):
+  //
+  //   0    -> 1.4  couple photo fades/rises in (now from 70px down,
+  //                was 20px — longer duration to match the bigger
+  //                distance, so it doesn't feel rushed)
+  //   1.4  -> 2.2  HOLD — nothing moves, reads as "arrived and settled"
+  //                before anything else starts
+  //   2.2  -> 5.0  THREE things at once: couple dissolves away
+  //                right-to-left (--wipe/blur/opacity), villa slides in
+  //                from the right (x: 150% -> 0, landing at its resting
+  //                spot — right: 6vw in the CSS, not dead center or
+  //                left anymore), and the save-block text (tagline +
+  //                date, NOT the monogram — that stays centered) slides
+  //                left (x: 0 -> -22vw) to get out of the way of — and
+  //                balance against — villa settling on the right
+  //   2.2  -> 6.8  villa's slow zoom (scale 1 -> 1.12, gentler than the
+  //                1.18 before — it's a smaller image now, doesn't need
+  //                as much growth) continues well past the slide-in
+  //   6.0  -> 6.8  "Orlando, FL, USA" fades in, once the push-in has
+  //                mostly landed
+  //
+  // Total timeline duration is 6.8 (the latest end time above) — the
+  // scrub maps that 1:1 onto .scroll-spacer's full scroll distance, so
+  // .scroll-spacer's height (210dvh) was sized to give this many beats
+  // comfortable, unhurried room.
+  // On mobile the villa moved below the text instead of beside it (see
+  // the @media block for .villa-image), so there's no longer anything
+  // for the text to make room for by shifting left — and -22vw was
+  // tuned against a wide desktop screen, so on a narrow phone that same
+  // distance pushes the text far enough left to clip against .stage's
+  // overflow:hidden. isMobileLayout picks 0 there instead.
+  const isMobileLayout = window.matchMedia('(max-width: 480px)').matches;
+  const saveBlockShift = isMobileLayout ? '0vw' : '-22vw';
+
+  gsap.timeline({
     scrollTrigger: {
       trigger: '.scroll-spacer',
       start: 'top bottom',
-      end: 'top 20%',
+      end: 'bottom bottom',
       scrub: 0.3
     }
-  });
+  })
+    .to('.sky-photo, .sky-scrim', { opacity: 1, y: 0, ease: 'none', duration: 1.4 }, 0)
+    // Was a physical x:'-100%' slide — swapped for a right-to-left
+    // dissolve-wipe (--wipe, see the CSS) plus a growing blur, so it
+    // reads as falling apart/vanishing in place rather than sliding
+    // off-screen. 115% (not 100%) on --wipe accounts for the mask's own
+    // 22-point feather, so the erased region actually reaches fully
+    // past the left edge by the end instead of leaving a barely-visible
+    // sliver. The opacity fade stays too, layered on top.
+    .to('.sky-photo, .sky-scrim', { '--wipe': '115%', filter: 'blur(10px)', opacity: 0, ease: 'none', duration: 2.8 }, 2.2)
+    // x:0 lands it exactly at the CSS's own resting position
+    // (right: 6vw) — the 150% starting offset lives in the CSS's base
+    // transform, not here.
+    .to('.villa-image', { x: '0%', ease: 'none', duration: 2.8 }, 2.2)
+    .to('.villa-image', { scale: 1.12, ease: 'none', duration: 4.6 }, 2.2)
+    // .monogram deliberately left out here — stays centered while only
+    // the save-block text shifts left, per feedback (desktop only —
+    // saveBlockShift is 0 on mobile, see above).
+    .to('.save-block', { x: saveBlockShift, ease: 'none', duration: 2.8 }, 2.2)
+    .to('.villa-caption', { opacity: 1, ease: 'none', duration: 0.8 }, 6);
 
   /*
     Simple page-load sequence (no scroll yet — first beat of what will
@@ -557,7 +790,18 @@ function startEnvelopeTransition() {
       ease: 'power1.inOut',
       // Unlock scrolling once the reveal has actually finished, not
       // before — scrolling mid-transition would fight the animation.
-      onComplete: () => document.body.classList.add('unlocked')
+      // scrollTo(0,0) here too, not just at page load — a restored
+      // scroll position can apparently still be "stored" on the
+      // document even while body has overflow:hidden (which blocks
+      // interactive scrolling but doesn't necessarily zero out that
+      // stored value), so it was still showing up the instant overflow
+      // switched to auto here, despite the page-load reset already
+      // having run. Forcing it again at the exact moment scrolling
+      // actually becomes possible closes that gap.
+      onComplete: () => {
+        window.scrollTo(0, 0);
+        document.body.classList.add('unlocked');
+      }
     }, reduceMotion ? 0 : 0.15);
 }
 
