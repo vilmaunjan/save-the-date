@@ -138,7 +138,14 @@ body.revealed { visibility: visible; }
   background-image: url('couple-2.webp');
   background-repeat: no-repeat;
   background-size: cover;
-  background-position: center 30%;
+  /* Was "center 30%" — the couple isn't actually centered in the photo
+     itself (Vilma sits left-of-center, Edgar further right, roughly
+     around the 57% mark across the image), so on narrow/mobile crop
+     windows (much narrower than the full photo under `cover`), a
+     geometric 50% center crops disproportionately into Edgar's side.
+     57% biases the crop window to actually center on the two of them
+     together, not the photo's raw midpoint. */
+  background-position: 57% 30%;
   /* Starts hidden even once .sky-scene itself is fully visible after the
      click — this and .sky-scrim fade in together on scroll (see the
      ScrollTrigger below), not immediately on click. Opacity here
@@ -218,11 +225,12 @@ body.revealed { visibility: visible; }
      other than a full screen's worth of scroll below .stage, so the
      ScrollTrigger fade below reads its "start" point as already passed
      before you've scrolled anything. */
-  /* 210dvh, up from 170dvh — elongates the whole sequence below (more
-     scroll distance per beat, plus a new beat: the text sliding left as
-     the villa enters), so it reads as slower/more gradual, not just
-     stretched-thin over the same distance. */
-  height: 210dvh;
+  /* Was 210dvh, sized for a timeline that ran all the way to 6.8 —
+     shrunk to 170dvh now that the zoom/text tweens end at 5.5 instead,
+     so the scroll distance still maps 1:1 onto the shortened timeline
+     rather than leaving a stretch of "dead" scroll at the end where
+     nothing was still animating. */
+  height: 170dvh;
 }
 
 /* ---- VILLA — now a layer inside .stage, not its own scene ----
@@ -240,7 +248,11 @@ body.revealed { visibility: visible; }
    the scene. */
 .villa-image {
   position: absolute;
-  top: 50%;
+  /* Was 50% — with the zoom now reaching scale 1.4 (up from 1.12), the
+     enlarged villa was growing down far enough to overlap
+     .villa-caption sitting at bottom:14vh. Moved up to give it
+     clearance. */
+  top: 42%;
   right: 6vw;
   /* Was 42vw/380px, then 48vw/430px — bumped up more this time. */
   width: 60vw;
@@ -268,7 +280,8 @@ body.revealed { visibility: visible; }
   text-align: center;
   font-family: 'EB Garamond', serif;
   font-weight: 600;
-  font-size: clamp(1rem, 2.6vw, 1.35rem);
+  /* Was clamp(1rem, 2.6vw, 1.35rem) — bumped up. */
+  font-size: clamp(1.3rem, 3.4vw, 1.8rem);
   text-transform: uppercase;
   letter-spacing: 0.4em;
   color: var(--ink);
@@ -478,6 +491,118 @@ body.revealed { visibility: visible; }
   opacity: 0;
 }
 
+/* ---- CLOSING SECTION — normal document flow, after .scroll-spacer ----
+   Not sticky-pinned like .stage — it doesn't need its own scroll
+   choreography, it just sits in normal flow and appears naturally as
+   .stage scrolls away above it once .scroll-spacer's range is used up
+   (same mechanic that already hands off couple-photo to villa). Simple
+   fade+rise on scroll-into-view (see the script), not the elaborate
+   scrubbed timeline the scenes above use — this is a closing beat, not
+   another whole scene. */
+.closing-section {
+  /* Was min-height:90vh + justify-content:center — centering content
+     inside a tall box leaves a large empty area ABOVE it (roughly half
+     the box's height), which is what was reading as "a big gap" right
+     after .stage scrolls away. Shorter box, content anchored toward the
+     top with a modest fixed padding instead of centered — content now
+     starts close to where .stage hands off, not floating in the middle
+     of a mostly-empty section. */
+  min-height: 55vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: clamp(2rem, 6vw, 3.5rem);
+  padding: 3rem 1.5rem 4rem;
+  text-align: center;
+  background: var(--parchment);
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.invitation-note {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(0.9rem, 2.2vw, 1.15rem);
+  text-transform: uppercase;
+  letter-spacing: 0.42em;
+  color: var(--ink);
+  /* nudge right to visually re-center against the letter-spacing,
+     same fix used on .save-date/.open-line elsewhere on this page */
+  padding-left: 0.42em;
+}
+
+.calendar-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.calendar-btn {
+  display: inline-block;
+  font-family: 'EB Garamond', serif;
+  font-weight: 600;
+  font-size: clamp(0.85rem, 2vw, 1rem);
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  color: var(--ink);
+  text-decoration: none;
+  border: 1px solid var(--ink);
+  padding: 0.9em 2.2em;
+  border-radius: 2px;
+  /* Re-centers the label against its own letter-spacing, same idea as
+     .save-date's padding-left trick. */
+  padding-left: 2.48em;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+.calendar-btn:hover {
+  background: var(--ink);
+  color: var(--parchment);
+}
+
+.calendar-alt {
+  display: inline-block;
+  margin-top: 1.1em;
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: clamp(0.75rem, 1.6vw, 0.85rem);
+  color: var(--ink);
+  opacity: 0.65;
+}
+
+.countdown {
+  display: flex;
+  justify-content: center;
+  gap: clamp(1.1rem, 4vw, 2.6rem);
+}
+.countdown-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 3.2em;
+}
+.countdown-num {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 600;
+  font-size: clamp(2rem, 6vw, 3.2rem);
+  color: var(--ink);
+  line-height: 1;
+  /* Locks digit width so the countdown doesn't visibly jitter/reflow
+     every second as digit widths change (e.g. "1" vs "8"). */
+  font-variant-numeric: tabular-nums;
+}
+.countdown-label {
+  font-family: 'EB Garamond', serif;
+  font-size: clamp(0.65rem, 1.4vw, 0.78rem);
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: var(--ink);
+  opacity: 0.65;
+  margin-top: 0.6em;
+  padding-left: 0.25em;
+}
+
 /* ---- MOBILE ---- */
 @media (max-width: 480px) {
   /* Was bottom:6vh — on mobile, .envelope-photo switches to
@@ -516,9 +641,10 @@ body.revealed { visibility: visible; }
      right, it just lands lower and centered instead of at the right
      edge, mid-height. */
   .villa-image {
-    /* Was 82% — too far down, sitting close to (or past) the bottom of
-       the screen. 66% instead. */
-    top: 66%;
+    /* Was 82%, then 66% — same reason as the desktop rule above: the
+       bigger scale-1.4 zoom was overlapping .villa-caption at the
+       bottom. Moved up further to 56%. */
+    top: 56%;
     left: 0;
     right: 0;
     margin: 0 auto;
@@ -535,7 +661,8 @@ body.revealed { visibility: visible; }
   .from-eyebrow,
   .from-names .letter,
   .sky-photo,
-  .sky-scrim {
+  .sky-scrim,
+  .closing-section {
     opacity: 1 !important;
     transform: none !important;
   }
@@ -556,6 +683,14 @@ body.revealed { visibility: visible; }
 <body>
 <noscript><style>body { visibility: visible !important; }</style></noscript>
 
+<!-- Wraps .stage + .scroll-spacer specifically so .stage's sticky
+     pinning is bounded to just this pair — sticky's release point is
+     governed by how much of its PARENT remains below it, so without
+     this wrapper, adding .closing-section as a later sibling of .stage
+     (both direct children of body) would extend .stage's pinned range
+     to cover .closing-section's scroll distance too, overlapping the
+     two instead of handing off cleanly. -->
+<div class="couple-villa-scroll">
 <div class="stage">
   <div class="backdrop"></div>
 
@@ -626,6 +761,40 @@ body.revealed { visibility: visible; }
      has something to scroll against, driving everything animated
      inside it (see the script). -->
 <div class="scroll-spacer"></div>
+</div>
+<!-- /.couple-villa-scroll -->
+
+<!-- Normal document flow, not sticky — appears as .stage scrolls away
+     above it (see the CSS comment on .closing-section). -->
+<div class="closing-section">
+  <div class="invitation-note">Invitation to follow</div>
+
+  <div class="calendar-block">
+    <!-- href/label/download set by JS based on device (Apple vs
+         everything else) — see the script. -->
+    <a class="calendar-btn" id="calendarPrimary" href="#">Add to calendar</a>
+    <a class="calendar-alt" id="calendarAlt" href="#">Add to calendar</a>
+  </div>
+
+  <div class="countdown" aria-label="Countdown to the wedding">
+    <div class="countdown-unit">
+      <span class="countdown-num" id="cdDays">00</span>
+      <span class="countdown-label">Days</span>
+    </div>
+    <div class="countdown-unit">
+      <span class="countdown-num" id="cdHours">00</span>
+      <span class="countdown-label">Hours</span>
+    </div>
+    <div class="countdown-unit">
+      <span class="countdown-num" id="cdMins">00</span>
+      <span class="countdown-label">Min</span>
+    </div>
+    <div class="countdown-unit">
+      <span class="countdown-num" id="cdSecs">00</span>
+      <span class="countdown-label">Sec</span>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
@@ -681,24 +850,35 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
   //                distance, so it doesn't feel rushed)
   //   1.4  -> 2.2  HOLD — nothing moves, reads as "arrived and settled"
   //                before anything else starts
-  //   2.2  -> 5.0  THREE things at once: couple dissolves away
-  //                right-to-left (--wipe/blur/opacity), villa slides in
-  //                from the right (x: 150% -> 0, landing at its resting
-  //                spot — right: 6vw in the CSS, not dead center or
-  //                left anymore), and the save-block text (tagline +
-  //                date, NOT the monogram — that stays centered) slides
-  //                left (x: 0 -> -22vw) to get out of the way of — and
-  //                balance against — villa settling on the right
-  //   2.2  -> 6.8  villa's slow zoom (scale 1 -> 1.12, gentler than the
-  //                1.18 before — it's a smaller image now, doesn't need
-  //                as much growth) continues well past the slide-in
-  //   6.0  -> 6.8  "Orlando, FL, USA" fades in, once the push-in has
-  //                mostly landed
+  //   2.2  -> 5.0  couple dissolves away right-to-left (--wipe/blur/
+  //                opacity) and villa slides in from the right
+  //                (x: 150% -> 0, landing at its resting spot —
+  //                right: 6vw in the CSS, not dead center or left)
+  //   2.2  -> 6.8  the save-block text (tagline + date, NOT the
+  //                monogram — that stays centered) slides left
+  //                (x: 0 -> -22vw, finishing at 6.8 not 5.0 — extended
+  //                so it settles at the same moment the zoom below
+  //                does, not early) to balance against villa settling
+  //                on the right
+  //   3.0  -> 6.8  villa's slow zoom (scale 1 -> 1.4 — was 1.12, barely
+  //                perceptible, bumped up for a genuinely noticeable
+  //                push-in) — starts partway through the slide-in above
+  //                (was tried at the slide's exact midpoint, 3.6, then
+  //                pulled slightly earlier), not simultaneously with
+  //                it, so sliding and zooming read as two connected but
+  //                distinct beats rather than everything happening at
+  //                once from frame one
+  //   3.0  -> 6.8  "Orlando, FL, USA" fades in RIGHT AS the zoom starts
+  //                and finishes exactly when it does too (was ending at
+  //                4.5 — extended to stay in step with the zoom's own
+  //                end instead of settling early)
   //
-  // Total timeline duration is 6.8 (the latest end time above) — the
-  // scrub maps that 1:1 onto .scroll-spacer's full scroll distance, so
-  // .scroll-spacer's height (210dvh) was sized to give this many beats
-  // comfortable, unhurried room.
+  // Total timeline duration is 5.5 (the latest end time above, was 6.8
+  // — trimmed so nothing keeps animating well past the slide-in's own
+  // finish at 5.0) — the scrub maps that 1:1 onto .scroll-spacer's full
+  // scroll distance, so .scroll-spacer's height (170dvh, also shrunk to
+  // match) doesn't leave a stretch of scroll at the end where nothing's
+  // actually still happening.
   // On mobile the villa moved below the text instead of beside it (see
   // the @media block for .villa-image), so there's no longer anything
   // for the text to make room for by shifting left — and -22vw was
@@ -707,6 +887,14 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
   // overflow:hidden. isMobileLayout picks 0 there instead.
   const isMobileLayout = window.matchMedia('(max-width: 480px)').matches;
   const saveBlockShift = isMobileLayout ? '0vw' : '-22vw';
+  // Mobile-only: as the villa enlarges below the text (see the @media
+  // block — villa sits below, not beside, on mobile), the save-block
+  // was just sitting still at its original spot, leaving a noticeable
+  // gap of empty space above it once the villa took up the bottom
+  // portion of the screen. Rising slightly tightens that up. 0 on
+  // desktop — the save-block already shifts left there instead, no
+  // vertical gap to fix.
+  const saveBlockRise = isMobileLayout ? '-9vh' : '0vh';
 
   gsap.timeline({
     scrollTrigger: {
@@ -727,14 +915,52 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     .to('.sky-photo, .sky-scrim', { '--wipe': '115%', filter: 'blur(10px)', opacity: 0, ease: 'none', duration: 2.8 }, 2.2)
     // x:0 lands it exactly at the CSS's own resting position
     // (right: 6vw) — the 150% starting offset lives in the CSS's base
-    // transform, not here.
+    // transform, not here. Spans 2.2 -> 5.0.
     .to('.villa-image', { x: '0%', ease: 'none', duration: 2.8 }, 2.2)
-    .to('.villa-image', { scale: 1.12, ease: 'none', duration: 4.6 }, 2.2)
+    // Was 3.6 (the slide-in's exact midpoint) — pulled earlier to 3.0,
+    // so the zoom kicks in a bit sooner relative to the slide instead of
+    // waiting all the way to the halfway mark. Scale target 1.4 for a
+    // genuinely noticeable push-in. Duration 2.5 (ending at 5.5) — was
+    // stretched to end at 6.8, well past the slide-in's own 5.0 finish,
+    // which meant a long stretch of extra scroll distance for very
+    // little visible change. 5.5 is just a touch past the slide-in
+    // finishing (5.0), enough to read as "still settling in" rather
+    // than snapping dead the instant the slide stops, without dragging
+    // on for its own separate scroll distance.
+    .to('.villa-image', { scale: 1.4, ease: 'none', duration: 2.5 }, 3.0)
     // .monogram deliberately left out here — stays centered while only
     // the save-block text shifts left, per feedback (desktop only —
-    // saveBlockShift is 0 on mobile, see above).
-    .to('.save-block', { x: saveBlockShift, ease: 'none', duration: 2.8 }, 2.2)
-    .to('.villa-caption', { opacity: 1, ease: 'none', duration: 0.8 }, 6);
+    // saveBlockShift is 0 on mobile, see above). Ends at 5.5 now too,
+    // matching the zoom's new, shorter end point.
+    .to('.save-block', { x: saveBlockShift, ease: 'none', duration: 3.3 }, 2.2)
+    // Separate tween (not merged into the one above) because it's
+    // timed differently — starts at 3.0, matching the villa's zoom,
+    // not 2.2 like the horizontal shift. 0 on desktop, so harmless
+    // there. Ends at 5.5, same as the zoom.
+    .to('.save-block', { y: saveBlockRise, ease: 'none', duration: 2.5 }, 3.0)
+    // Shifted along with the zoom above (now 3.0), so it still appears
+    // the instant the zoom starts. Ends at 5.5, in step with the zoom.
+    .to('.villa-caption', { opacity: 1, ease: 'none', duration: 2.5 }, 3.0);
+
+  // .closing-section: a plain fade+rise the moment it scrolls into
+  // view, not tied to the master timeline above — it's not part of the
+  // .stage choreography (it's not even inside .stage), it just sits in
+  // normal flow and gets revealed once, like a simpler version of the
+  // reveals used elsewhere on the page. toggleActions 'play none none
+  // reverse' means it plays forward once you scroll to it and reverses
+  // if you scroll back up past it, rather than the scrub-tied,
+  // exactly-follows-your-finger motion the scenes above use.
+  gsap.to('.closing-section', {
+    opacity: 1,
+    y: 0,
+    duration: 1,
+    ease: 'power2.out',
+    scrollTrigger: {
+      trigger: '.closing-section',
+      start: 'top 85%',
+      toggleActions: 'play none none reverse'
+    }
+  });
 
   /*
     Simple page-load sequence (no scroll yet — first beat of what will
@@ -837,6 +1063,86 @@ document.querySelector('.stage').addEventListener('click', () => {
     setTimeout(startEnvelopeTransition, reduceMotion ? 0 : 550);
   }
 });
+
+// ---- CALENDAR + COUNTDOWN — functional, not decorative, so this runs
+// unconditionally (outside the reduced-motion gate above; nothing here
+// is an animation reduced-motion would need to skip). ----
+
+// All-day event, April 30th 2027. Google Calendar's all-day "dates"
+// param and the .ics DTSTART/DTEND below both use an EXCLUSIVE end
+// date, so "ends" 20270501 (May 1st) for an event that's just the 30th.
+const EVENT_TITLE = "Edgar & Vilma's Wedding";
+const EVENT_LOCATION = 'Orlando, FL, USA';
+const EVENT_DETAILS = 'Save the date! Formal invitation to follow.';
+const EVENT_START = '20270430';
+const EVENT_END = '20270501';
+
+const googleCalendarUrl =
+  'https://calendar.google.com/calendar/render?action=TEMPLATE'
+  + '&text=' + encodeURIComponent(EVENT_TITLE)
+  + '&dates=' + EVENT_START + '/' + EVENT_END
+  + '&details=' + encodeURIComponent(EVENT_DETAILS)
+  + '&location=' + encodeURIComponent(EVENT_LOCATION);
+
+// \r\n line endings per the iCalendar spec (RFC 5545) — most parsers
+// tolerate bare \n, but this is what the spec actually asks for.
+const icsContent = [
+  'BEGIN:VCALENDAR',
+  'VERSION:2.0',
+  'BEGIN:VEVENT',
+  'DTSTART;VALUE=DATE:' + EVENT_START,
+  'DTEND;VALUE=DATE:' + EVENT_END,
+  'SUMMARY:' + EVENT_TITLE,
+  'LOCATION:' + EVENT_LOCATION,
+  'DESCRIPTION:' + EVENT_DETAILS,
+  'END:VEVENT',
+  'END:VCALENDAR'
+].join('\r\n');
+const icsHref = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(icsContent);
+
+// Apple devices get a native one-tap "Add Event" flow from an .ics
+// link; everything else (Android, Windows, Linux) gets a much smoother
+// experience from the Google Calendar link than from a downloaded .ics
+// they'd have to manually import. Primary button picks whichever fits
+// the device; the secondary link always offers the other option, in
+// case detection guesses wrong or someone just prefers it.
+const isAppleDevice = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+const calendarPrimary = document.getElementById('calendarPrimary');
+const calendarAlt = document.getElementById('calendarAlt');
+
+if (isAppleDevice) {
+  calendarPrimary.href = icsHref;
+  calendarPrimary.download = 'edgar-vilma-wedding.ics';
+  calendarAlt.href = googleCalendarUrl;
+  calendarAlt.target = '_blank';
+  calendarAlt.rel = 'noopener';
+  calendarAlt.textContent = 'Prefer Google Calendar?';
+} else {
+  calendarPrimary.href = googleCalendarUrl;
+  calendarPrimary.target = '_blank';
+  calendarPrimary.rel = 'noopener';
+  calendarAlt.href = icsHref;
+  calendarAlt.download = 'edgar-vilma-wedding.ics';
+  calendarAlt.textContent = 'Prefer Apple Calendar or Outlook?';
+}
+
+// Countdown to April 30th 2027, Orlando local time (UTC-4, Eastern
+// Daylight Time — the wedding is in April, DST is already in effect).
+const WEDDING_DATE = new Date('2027-04-30T00:00:00-04:00');
+
+function updateCountdown() {
+  const msRemaining = Math.max(0, WEDDING_DATE - new Date());
+  const days = Math.floor(msRemaining / 86400000);
+  const hours = Math.floor(msRemaining / 3600000) % 24;
+  const mins = Math.floor(msRemaining / 60000) % 60;
+  const secs = Math.floor(msRemaining / 1000) % 60;
+  document.getElementById('cdDays').textContent = String(days);
+  document.getElementById('cdHours').textContent = String(hours).padStart(2, '0');
+  document.getElementById('cdMins').textContent = String(mins).padStart(2, '0');
+  document.getElementById('cdSecs').textContent = String(secs).padStart(2, '0');
+}
+updateCountdown();
+setInterval(updateCountdown, 1000);
 </script>
 
 </body>
