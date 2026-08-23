@@ -384,7 +384,15 @@ body.unlocked { overflow: auto; }
 
 /* ---- MOBILE ---- */
 @media (max-width: 480px) {
-  .open-line  { bottom: 6vh; letter-spacing: 0.3em; }
+  /* Was bottom:6vh — on mobile, .envelope-photo switches to
+     background-size:contain (see below), which no longer fills the
+     screen edge-to-edge, so the envelope's actual bottom edge sits well
+     above the screen's bottom edge. 20dvh roughly splits the difference
+     between the two instead of pinning tight to the bottom, which used
+     to leave a big empty gap above the text and cram it too close to
+     the edge. dvh (not vh), matching .stage, so this doesn't drift on
+     phones where the address bar changes the viewport height. */
+  .open-line  { bottom: 20dvh; letter-spacing: 0.3em; }
   .from-block { top: 9vh; }
   .save-block { top: 33%; }
   /* cover forces a wide envelope photo to fill a tall, narrow phone
