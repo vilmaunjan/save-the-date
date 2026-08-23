@@ -1002,6 +1002,24 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
 let opened = false;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// A more robust guard on top of the page-load/window-load resets
+// above: those try to catch the browser's scroll-restoration at
+// specific points in time, but apparently it can still land later than
+// all of them (probably tied to something async like web font
+// loading finishing after 'load' already fired) — which showed up as
+// the villa/caption/closing-section briefly visible UNDER the still-
+// closed envelope, since those are scroll-driven independent of
+// whether the envelope's been clicked. Instead of guessing the right
+// moment, just actively watch: body has overflow:hidden until opened
+// anyway, so the ONLY way scroll can become nonzero before that is the
+// browser doing it to us, not the visitor scrolling — snap it back
+// immediately, whenever it happens.
+window.addEventListener('scroll', () => {
+  if (!opened && window.scrollY !== 0) {
+    window.scrollTo(0, 0);
+  }
+});
+
 function startEnvelopeTransition() {
   const d = reduceMotion ? 0 : 1;
   gsap.timeline()
