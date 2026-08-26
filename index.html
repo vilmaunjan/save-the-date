@@ -417,7 +417,8 @@ body.revealed { visibility: visible; }
 .save-date {
   font-family: 'EB Garamond', serif;
   font-weight: 500;
-  font-size: clamp(1.1rem, 2.8vw, 1.5rem);
+  /* Was clamp(1.1rem, 2.8vw, 1.5rem) — bumped up per feedback. */
+  font-size: clamp(1.4rem, 3.6vw, 1.95rem);
   text-transform: uppercase;
   letter-spacing: 0.38em;
   color: var(--ink);
@@ -587,6 +588,29 @@ body.revealed { visibility: visible; }
   font-size: clamp(0.75rem, 1.6vw, 0.85rem);
   color: var(--ink);
   opacity: 0.65;
+}
+
+/* Fixed position (not absolute within .stage) so it stays put through
+   the ENTIRE page, including .closing-section which sits outside
+   .stage entirely. Small and low-contrast on purpose — a visible but
+   quiet escape hatch, not a prominent control, since auto-detection
+   should get it right for most visitors already. */
+.lang-toggle {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  z-index: 50;
+  background: rgba(247, 241, 228, 0.82);
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font-family: 'EB Garamond', serif;
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.5em 0.85em;
+  border-radius: 999px;
+  cursor: pointer;
 }
 
 .countdown {
@@ -794,25 +818,32 @@ body.revealed { visibility: visible; }
     <a class="calendar-alt" id="calendarAlt" href="#">Add to calendar</a>
   </div>
 
-  <div class="countdown" aria-label="Countdown to the wedding">
+  <div class="countdown" id="countdownRoot" aria-label="Countdown to the wedding">
     <div class="countdown-unit">
       <span class="countdown-num" id="cdDays">00</span>
-      <span class="countdown-label">Days</span>
+      <span class="countdown-label" id="cdDaysLabel">Days</span>
     </div>
     <div class="countdown-unit">
       <span class="countdown-num" id="cdHours">00</span>
-      <span class="countdown-label">Hours</span>
+      <span class="countdown-label" id="cdHoursLabel">Hours</span>
     </div>
     <div class="countdown-unit">
       <span class="countdown-num" id="cdMins">00</span>
-      <span class="countdown-label">Min</span>
+      <span class="countdown-label" id="cdMinsLabel">Min</span>
     </div>
     <div class="countdown-unit">
       <span class="countdown-num" id="cdSecs">00</span>
-      <span class="countdown-label">Sec</span>
+      <span class="countdown-label" id="cdSecsLabel">Sec</span>
     </div>
   </div>
 </div>
+
+<!-- Fixed so it stays visible regardless of scroll position throughout
+     the whole page, not just within .stage. Shows the OTHER language's
+     code — i.e. reads "ES" while the page is in English, tap to switch
+     to Spanish. Auto-detected on load (see the script); this is the
+     manual override for whenever that guess is wrong. -->
+<button id="langToggle" class="lang-toggle" type="button" aria-label="Switch language">ES</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
@@ -1122,67 +1153,199 @@ document.querySelector('.stage').addEventListener('click', () => {
   }
 });
 
-// ---- CALENDAR + COUNTDOWN — functional, not decorative, so this runs
-// unconditionally (outside the reduced-motion gate above; nothing here
-// is an animation reduced-motion would need to skip). ----
+// ---- LANGUAGE (EN/ES) — functional, not decorative, so this runs
+// unconditionally (outside the reduced-motion gate above). Auto-detects
+// from the browser's language setting on first visit, remembers a
+// manual override after that. One HTML file with both languages baked
+// in and swapped via textContent — not two separate pages — so the
+// GSAP timelines above (which target elements by class, never by their
+// text) don't care which language is showing; nothing about the
+// scroll choreography needs duplicating per language. ----
 
-// All-day event, April 30th 2027. Google Calendar's all-day "dates"
-// param and the .ics DTSTART/DTEND below both use an EXCLUSIVE end
-// date, so "ends" 20270501 (May 1st) for an event that's just the 30th.
-const EVENT_TITLE = "Edgar & Vilma's Wedding";
+const TRANSLATIONS = {
+  en: {
+    pageTitle: 'A Love Letter — Edgar & Vilma',
+    openLine: 'Open the invitation',
+    fromEyebrow: 'A Love letter from',
+    saveTagline: 'Save The Date',
+    saveDate: 'April 30th, 2027',
+    scrollHint: 'Scroll for more',
+    invitationNote: 'Invitation to follow',
+    calendarBtn: 'Add to calendar',
+    calendarAltGoogle: 'Prefer Google Calendar?',
+    calendarAltApple: 'Prefer Apple Calendar or Outlook?',
+    cdDays: 'Days',
+    cdHours: 'Hours',
+    cdMins: 'Min',
+    cdSecs: 'Sec',
+    eventTitle: "Edgar & Vilma's Wedding",
+    eventDetails: 'Save the date! Formal invitation to follow.',
+    monogramAria: 'Edgar and Vilma monogram',
+    envelopeAria: 'Cream wedding invitation envelope with a wax seal monogrammed E and V',
+    skyPhotoAria: 'Edgar and Vilma on the beach',
+    villaAria: 'Watercolor illustration of the Tuscan-style villa',
+    countdownAria: 'Countdown to the wedding'
+  },
+  es: {
+    pageTitle: 'Una Carta de Amor — Edgar & Vilma',
+    openLine: 'Abre la invitación',
+    fromEyebrow: 'Una carta de amor de',
+    saveTagline: 'Reserva La Fecha',
+    saveDate: '30 de abril de 2027',
+    scrollHint: 'Desliza para ver más',
+    invitationNote: 'La invitación llegará pronto',
+    calendarBtn: 'Añadir al calendario',
+    calendarAltGoogle: '¿Prefieres Google Calendar?',
+    calendarAltApple: '¿Prefieres Apple Calendar u Outlook?',
+    cdDays: 'Días',
+    cdHours: 'Horas',
+    cdMins: 'Min',
+    cdSecs: 'Seg',
+    eventTitle: 'Boda de Edgar y Vilma',
+    eventDetails: '¡Reserva la fecha! La invitación formal llegará pronto.',
+    monogramAria: 'Monograma de Edgar y Vilma',
+    envelopeAria: 'Sobre de invitación de boda color crema con un sello de cera con las iniciales E y V',
+    skyPhotoAria: 'Edgar y Vilma en la playa',
+    villaAria: 'Ilustración en acuarela de una villa de estilo toscano',
+    countdownAria: 'Cuenta regresiva para la boda'
+  }
+};
+
+// EVENT_LOCATION isn't in TRANSLATIONS — a place name, kept the same in
+// both languages (this is the actual practice for city/venue names,
+// not something that gets translated). All-day event, April 30th 2027;
+// Google Calendar's all-day "dates" param and the .ics DTSTART/DTEND
+// below both use an EXCLUSIVE end date, so "ends" 20270501 (May 1st)
+// for an event that's just the 30th.
 const EVENT_LOCATION = 'Orlando, FL, USA';
-const EVENT_DETAILS = 'Save the date! Formal invitation to follow.';
 const EVENT_START = '20270430';
 const EVENT_END = '20270501';
 
-const googleCalendarUrl =
-  'https://calendar.google.com/calendar/render?action=TEMPLATE'
-  + '&text=' + encodeURIComponent(EVENT_TITLE)
-  + '&dates=' + EVENT_START + '/' + EVENT_END
-  + '&details=' + encodeURIComponent(EVENT_DETAILS)
-  + '&location=' + encodeURIComponent(EVENT_LOCATION);
-
-// \r\n line endings per the iCalendar spec (RFC 5545) — most parsers
-// tolerate bare \n, but this is what the spec actually asks for.
-const icsContent = [
-  'BEGIN:VCALENDAR',
-  'VERSION:2.0',
-  'BEGIN:VEVENT',
-  'DTSTART;VALUE=DATE:' + EVENT_START,
-  'DTEND;VALUE=DATE:' + EVENT_END,
-  'SUMMARY:' + EVENT_TITLE,
-  'LOCATION:' + EVENT_LOCATION,
-  'DESCRIPTION:' + EVENT_DETAILS,
-  'END:VEVENT',
-  'END:VCALENDAR'
-].join('\r\n');
-const icsHref = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(icsContent);
-
-// Apple devices get a native one-tap "Add Event" flow from an .ics
-// link; everything else (Android, Windows, Linux) gets a much smoother
-// experience from the Google Calendar link than from a downloaded .ics
-// they'd have to manually import. Primary button picks whichever fits
-// the device; the secondary link always offers the other option, in
-// case detection guesses wrong or someone just prefers it.
 const isAppleDevice = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
 const calendarPrimary = document.getElementById('calendarPrimary');
 const calendarAlt = document.getElementById('calendarAlt');
+const langToggle = document.getElementById('langToggle');
 
-if (isAppleDevice) {
-  calendarPrimary.href = icsHref;
-  calendarPrimary.download = 'edgar-vilma-wedding.ics';
-  calendarAlt.href = googleCalendarUrl;
-  calendarAlt.target = '_blank';
-  calendarAlt.rel = 'noopener';
-  calendarAlt.textContent = 'Prefer Google Calendar?';
-} else {
-  calendarPrimary.href = googleCalendarUrl;
-  calendarPrimary.target = '_blank';
-  calendarPrimary.rel = 'noopener';
-  calendarAlt.href = icsHref;
-  calendarAlt.download = 'edgar-vilma-wedding.ics';
-  calendarAlt.textContent = 'Prefer Apple Calendar or Outlook?';
+// Rebuilds the Google Calendar / .ics links against whichever
+// language's event title+details are currently active, then re-applies
+// the Apple-vs-everything-else button assignment (same logic as
+// before, just wrapped in a function now so language switches can
+// re-run it).
+function applyCalendarLinks(lang) {
+  const t = TRANSLATIONS[lang];
+
+  const googleCalendarUrl =
+    'https://calendar.google.com/calendar/render?action=TEMPLATE'
+    + '&text=' + encodeURIComponent(t.eventTitle)
+    + '&dates=' + EVENT_START + '/' + EVENT_END
+    + '&details=' + encodeURIComponent(t.eventDetails)
+    + '&location=' + encodeURIComponent(EVENT_LOCATION);
+
+  // \r\n line endings per the iCalendar spec (RFC 5545) — most parsers
+  // tolerate bare \n, but this is what the spec actually asks for.
+  const icsContent = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'BEGIN:VEVENT',
+    'DTSTART;VALUE=DATE:' + EVENT_START,
+    'DTEND;VALUE=DATE:' + EVENT_END,
+    'SUMMARY:' + t.eventTitle,
+    'LOCATION:' + EVENT_LOCATION,
+    'DESCRIPTION:' + t.eventDetails,
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+  const icsHref = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(icsContent);
+
+  calendarPrimary.textContent = t.calendarBtn;
+
+  // Apple devices get a native one-tap "Add Event" flow from an .ics
+  // link; everything else (Android, Windows, Linux) gets a much
+  // smoother experience from the Google Calendar link than from a
+  // downloaded .ics they'd have to manually import. Primary button
+  // picks whichever fits the device; the secondary link always offers
+  // the other option, in case detection guesses wrong or someone just
+  // prefers it.
+  if (isAppleDevice) {
+    calendarPrimary.href = icsHref;
+    calendarPrimary.download = 'edgar-vilma-wedding.ics';
+    calendarAlt.href = googleCalendarUrl;
+    calendarAlt.target = '_blank';
+    calendarAlt.rel = 'noopener';
+    calendarAlt.textContent = t.calendarAltGoogle;
+  } else {
+    calendarPrimary.href = googleCalendarUrl;
+    calendarPrimary.target = '_blank';
+    calendarPrimary.rel = 'noopener';
+    calendarAlt.href = icsHref;
+    calendarAlt.download = 'edgar-vilma-wedding.ics';
+    calendarAlt.textContent = t.calendarAltApple;
+  }
 }
+
+// Applies one language across every translated element on the page.
+// Sets textContent only — never innerHTML or class — so this can't
+// touch the per-letter <span> structure inside .from-names (that's a
+// name, "Edgar & Vilma", and doesn't get translated at all) or any
+// other element's animation-relevant markup.
+function applyLanguage(lang) {
+  const t = TRANSLATIONS[lang];
+  document.title = t.pageTitle;
+  document.documentElement.lang = lang;
+  document.querySelector('.open-line').textContent = t.openLine;
+  document.querySelector('.from-eyebrow').textContent = t.fromEyebrow;
+  document.querySelector('.save-tagline').textContent = t.saveTagline;
+  document.querySelector('.save-date').textContent = t.saveDate;
+  document.querySelector('.scroll-hint').textContent = t.scrollHint;
+  document.querySelector('.invitation-note').textContent = t.invitationNote;
+  document.getElementById('cdDaysLabel').textContent = t.cdDays;
+  document.getElementById('cdHoursLabel').textContent = t.cdHours;
+  document.getElementById('cdMinsLabel').textContent = t.cdMins;
+  document.getElementById('cdSecsLabel').textContent = t.cdSecs;
+  document.getElementById('countdownRoot').setAttribute('aria-label', t.countdownAria);
+  document.querySelector('.sky-photo').setAttribute('aria-label', t.skyPhotoAria);
+  document.querySelector('.villa-image').setAttribute('aria-label', t.villaAria);
+  document.querySelector('.monogram').setAttribute('aria-label', t.monogramAria);
+  document.querySelector('.envelope-photo').setAttribute('aria-label', t.envelopeAria);
+  applyCalendarLinks(lang);
+  // Toggle shows the OTHER language's code — what tapping it switches
+  // TO, not what's currently showing.
+  langToggle.textContent = lang === 'en' ? 'ES' : 'EN';
+  try {
+    localStorage.setItem('siteLang', lang);
+  } catch (e) {
+    // Private browsing / storage disabled — language just won't be
+    // remembered on the next visit, which is fine, not worth
+    // interrupting anything over.
+  }
+}
+
+// A manual choice from a previous visit always wins; otherwise, guess
+// from the browser's own language setting. This is what makes "how
+// will guests know" a non-issue for most people — the right language
+// just shows up, no discovery required.
+function detectInitialLang() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem('siteLang');
+  } catch (e) {
+    // Same as above — ignore, fall through to detection.
+  }
+  if (saved === 'en' || saved === 'es') return saved;
+  const browserLang = (navigator.language || '').toLowerCase();
+  return browserLang.startsWith('es') ? 'es' : 'en';
+}
+
+let currentLang = detectInitialLang();
+applyLanguage(currentLang);
+
+langToggle.addEventListener('click', () => {
+  currentLang = currentLang === 'en' ? 'es' : 'en';
+  applyLanguage(currentLang);
+});
+
+// ---- COUNTDOWN — the ticking numbers themselves aren't translated
+// content, just runs alongside the language setup above. ----
 
 // Countdown to April 30th 2027, Orlando local time (UTC-4, Eastern
 // Daylight Time — the wedding is in April, DST is already in effect).
