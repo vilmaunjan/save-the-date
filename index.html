@@ -25,6 +25,19 @@
   --envelope-cream: #EDE4DB;
 }
 
+/* Registers --wipe (used by .sky-photo/.sky-scrim's dissolve-wipe mask)
+   as an actual typed, animatable value instead of an opaque string.
+   Without this, every GSAP update to --wipe forces the browser to
+   re-parse the whole mask-image gradient from scratch as text; with
+   it, the browser knows it's a real interpolatable <percentage> and
+   can update it far more cheaply — meaningful given this animates on
+   every scroll tick during the dissolve. */
+@property --wipe {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 /* background: matches body, as a fallback behind the page.
@@ -162,20 +175,17 @@ body.revealed { visibility: visible; }
      means the gradient's 0% stop sits at the right edge, 100% at the
      left, so growing --wipe erases right-to-left. The ~20-point gap
      between the two transparent/black stops is the feather: a soft,
-     gradual dissolve rather than a hard-edged wipe. blur grows in the
-     same tween, so what's left as it erases also softens instead of
-     staying crisply defined right up until it disappears — together
-     these read as falling apart, not sliding away.  */
+     gradual dissolve rather than a hard-edged wipe, reading as falling
+     apart rather than sliding away. (Used to also grow a blur filter in
+     the same tween for extra softness — dropped it, animated blur on a
+     large photo was expensive enough to cause visible frame drops.) */
   --wipe: 0%;
   -webkit-mask-image: linear-gradient(to left, transparent 0%, transparent var(--wipe), black calc(var(--wipe) + 22%), black 100%);
   mask-image: linear-gradient(to left, transparent 0%, transparent var(--wipe), black calc(var(--wipe) + 22%), black 100%);
-  filter: blur(0px);
   /* Hints the browser to promote this to its own compositing layer
      ahead of time, rather than discovering mid-scroll that it needs
-     to — this element animates transform, opacity, mask, AND filter
-     simultaneously, about as much per-frame work as anything on this
-     page does. */
-  will-change: transform, opacity, filter;
+     to. */
+  will-change: transform, opacity;
 }
 
 /* Parchment-tinted wash over the photo so the ink-colored monogram and
@@ -210,8 +220,7 @@ body.revealed { visibility: visible; }
   --wipe: 0%;
   -webkit-mask-image: linear-gradient(to left, transparent 0%, transparent var(--wipe), black calc(var(--wipe) + 22%), black 100%);
   mask-image: linear-gradient(to left, transparent 0%, transparent var(--wipe), black calc(var(--wipe) + 22%), black 100%);
-  filter: blur(0px);
-  will-change: transform, opacity, filter;
+  will-change: transform, opacity;
 }
 
 /* Pure scroll room — no content of its own. Gives the (sticky-pinned)
@@ -910,16 +919,18 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       trigger: '.scroll-spacer',
       start: 'top bottom',
       end: 'bottom bottom',
-      // Was 0.3 — a low scrub value tracks raw scroll position very
-      // literally, which on a fast fling (large, irregular per-frame
-      // scroll jumps, especially on touch) shows up as visibly choppy
-      // motion rather than smooth. A higher value smooths that out —
-      // the animation eases toward the current scroll position instead
-      // of snapping straight to it every tick, effectively low-pass
-      // filtering jittery scroll input into fluid motion. Trades a
-      // touch of lag on slow, deliberate scrolling for a lot less jank
-      // on fast ones.
-      scrub: 0.6
+      // History: 0.3 -> 0.6 (smoothed fast flings, but caused visible
+      // lag on slow scrolls — the animation trails up to 0.6s behind
+      // actual scroll position, which reads as "I moved a lot, nothing
+      // changed") -> 0.35 (still meaningfully laggy). The actual fix
+      // was the dropped blur filter above (removed, not just lightened)
+      // plus the @property registration on --wipe — those cut the real
+      // per-frame rendering cost that was causing dropped frames in the
+      // first place. scrub was never the right lever for that; a low
+      // value here just means "track scroll position closely," which
+      // is what you actually want once the per-frame cost is
+      // reasonable.
+      scrub: 0.2
     }
   })
     .to('.sky-photo, .sky-scrim', { opacity: 1, y: 0, ease: 'none', duration: 1.4 }, 0)
@@ -929,13 +940,19 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     // off-screen. 115% (not 100%) on --wipe accounts for the mask's own
     // 22-point feather, so the erased region actually reaches fully
     // past the left edge by the end instead of leaving a barely-visible
-    // sliver. The opacity fade stays too, layered on top. blur target
-    // was 10px — animated filter blur is one of the more expensive CSS
-    // properties to recompute every frame (cost scales with the blur
-    // radius, not linearly), and on a fast fling that was contributing
-    // to visible choppiness. 5px still reads as a soft dissolve at a
-    // meaningfully lower per-frame cost.
-    .to('.sky-photo, .sky-scrim', { '--wipe': '115%', filter: 'blur(5px)', opacity: 0, ease: 'none', duration: 2.8 }, 2.2)
+    // sliver. The opacity fade stays too, layered on top.
+    //
+    // Dropped the animated blur entirely (was 10px, then 5px, still too
+    // costly) — this was the actual root cause of the choppiness/lag,
+    // not the scrub value. Animated filter:blur is one of the most
+    // expensive things a browser recomputes per frame, and stacked on
+    // top of an animated mask on a large real photo (couple-2.webp),
+    // it was eating enough frame budget to visibly drop frames — no
+    // scrub number fixes dropped frames, scrub only changes how the
+    // animation interpolates BETWEEN frames that do render. The mask
+    // wipe + opacity fade alone still read as a soft dissolve, just
+    // without the extra blur layered on.
+    .to('.sky-photo, .sky-scrim', { '--wipe': '115%', opacity: 0, ease: 'none', duration: 2.8 }, 2.2)
     // x:0 lands it exactly at the CSS's own resting position
     // (right: 6vw) — the 150% starting offset lives in the CSS's base
     // transform, not here. Spans 2.2 -> 5.0.
