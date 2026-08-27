@@ -58,6 +58,13 @@ body {
   color: var(--ink);
   background: var(--parchment);
   overscroll-behavior-y: none;
+  /* No text on this page is meant to be selected/copied — it's a
+     click-through decorative site, not an article. Long-pressing on
+     mobile was popping the selection highlight/callout menu, which
+     read as broken rather than intentional. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   /* Locked (no scroll) during the envelope intro — there's nothing to
      scroll to yet anyway, but this keeps it explicit. Unlocked by JS
      once the click reveal finishes, so scrolling down through
@@ -317,7 +324,7 @@ body.revealed { visibility: visible; }
   text-align: center;
   font-family: 'EB Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.72rem, 1.6vw, 0.85rem);
+  font-size: clamp(0.83rem, 1.85vw, 0.98rem);
   text-transform: uppercase;
   letter-spacing: 0.3em;
   color: var(--ink);
@@ -448,12 +455,162 @@ body.revealed { visibility: visible; }
   transform: scale(1.02);
 }
 
+/* ---- OLIVER — a one-time run across the envelope screen ----
+   oliver-sprite.png: 8 hand-drawn frames in one horizontal strip,
+   chroma-keyed transparent, no ground line. Two animations run
+   together: oliverRunAcross moves the whole element left-to-right
+   once; oliverRunCycle steps through the 8 frames on a loop the whole
+   time it's crossing, via background-position stepping
+   (background-size:800% = 8 frames wide, each step call moves exactly
+   one frame-width). aspect-ratio keeps it proportional at any screen
+   width instead of a fixed pixel size. */
+.oliver-run {
+  position: absolute;
+  bottom: 0;
+  width: clamp(100px, 24vw, 160px);
+  aspect-ratio: 385 / 220;
+  background-image: url('oliver-sprite.png');
+  background-repeat: no-repeat;
+  background-size: 800% 100%;
+  /* Art faces left; he moves left-to-right, so mirror him to face the
+     direction he's traveling (otherwise he visually runs backwards). */
+  transform: scaleX(-1);
+  opacity: 0;
+  pointer-events: none;
+  /* The two animations are intentionally independent: oliverRunCycle
+     is his leg/gait pace (how fast he's running in place) and stays
+     fixed regardless of crossing speed — only oliverRunAcross's
+     duration controls how much screen distance he covers per second.
+     Movement is linear (constant speed, no easing) so that
+     distance/sec stays constant across the whole crossing rather than
+     accelerating/decelerating at the ends. oliverRunCycle loops
+     `infinite` rather than a fixed count so it isn't tied to
+     oliverRunAcross's duration — change one without needing to
+     recompute the other. 1s delay on BOTH so he starts already at
+     full speed/visible (not fading in mid-stride) — he's chasing the
+     ball (see .ball-run below), which starts at 0s with the identical
+     path/speed, so this delay is what keeps him a beat behind for the
+     whole crossing rather than catching up. */
+  animation:
+    oliverRunAcross 7.6s 1s linear forwards,
+    oliverRunCycle 1s 1s steps(7) infinite;
+}
+@keyframes oliverRunAcross {
+  /* Starts at the left edge (not off-screen at -28vw) so he's already
+     visible in the first frame after his delay — see .ball-run for
+     why the same choice was made there. */
+  0%   { left: 0vw; opacity: 1; }
+  100% { left: 108vw; opacity: 1; }
+}
+@keyframes oliverRunCycle {
+  from { background-position: 0% 0; }
+  to   { background-position: 100% 0; }
+}
+
+/* ---- BALL — Oliver's chase target, same path/speed, no head start ----
+   ball-sprite.png: 8 frames, but unlike oliver-sprite.png/duque-
+   sprite.png (each frame cropped to an IDENTICAL window so a looping
+   gait reads as in-place motion), these frames were intentionally
+   cropped to preserve each frame's own vertical position from the
+   source gif — the ball is falling/bouncing within the frame, not
+   running in place. So background-position stepping through them
+   plays out an actual bounce arc, not a stabilized loop. Combined
+   with ballRunAcross (identical path/speed to oliverRunAcross, just
+   with no delay so it leads) this reads as the ball bouncing while
+   rolling across the screen, with Oliver chasing a beat behind. */
+.ball-run {
+  position: absolute;
+  bottom: 0;
+  /* Was clamp(28px,6.5vw,50px) — a tennis ball next to a dog is small,
+     roughly an eighth of his body length in real life; the old size
+     read as a beach ball. This targets ~14% of Oliver's own width
+     clamp (100-160px) instead of an unrelated fixed size. */
+  width: clamp(14px, 3.2vw, 22px);
+  aspect-ratio: 50 / 223;
+  background-image: url('ball-sprite.png');
+  background-repeat: no-repeat;
+  background-size: 800% 100%;
+  opacity: 0;
+  pointer-events: none;
+  animation:
+    ballRunAcross 7.3s linear forwards,
+    /* alternate (not infinite-forward-only): the 8 frames trace ONE
+       downward bounce, not a circular loop — playing forward then
+       backward through them gives a smooth down/up bounce instead of
+       snapping from frame 8 back to frame 0 every cycle. */
+    ballBounce 0.6s steps(7) infinite alternate;
+}
+@keyframes ballRunAcross {
+  0%   { left: 0vw; opacity: 1; }
+  100% { left: 108vw; opacity: 1; }
+}
+@keyframes ballBounce {
+  from { background-position: 0% 0; }
+  to   { background-position: 100% 0; }
+}
+
+/* ---- DUQUE — lying down on top of the word "invitation" ----
+   duque-sprite.png: 7 frames of the same resting pose (near-identical
+   bounding box in the source gif — just a subtle idle wiggle, no run
+   cycle). No left/right movement — just the idle frame-cycle. Was
+   originally bottom:0 on the same row Oliver/the ball run across,
+   which meant their sprite boxes visibly crossed through him mid-
+   chase; moved up here instead, off that lane entirely, positioned
+   like he's resting on the last word of .open-line ("...invitation").
+   `left` is a measured (not guessed) center-alignment: got the actual
+   rendered bounding box of the word "invitation" in .open-line via
+   Range.getBoundingClientRect(), at both this breakpoint's reference
+   width and the mobile override's below — .open-line's letter-spacing
+   differs between the two (0.42em vs 0.3em), so the word lands at a
+   different vw position at each, not just a scaled version of the
+   other. `bottom` was originally set to match .open-line's own bottom
+   exactly (his body sitting right at the text's baseline), but that
+   put him low enough to actually cover the letters — raised by ~4vh
+   so there's clear space between him and the text instead of resting
+   on it. Left unmirrored (his natural facing direction) since he's
+   decorative here, not oriented toward anything in particular. */
+.duque-rest {
+  position: absolute;
+  bottom: 18vh;
+  left: calc(58.5vw - 70px);
+  width: clamp(90px, 20vw, 140px);
+  aspect-ratio: 379 / 220;
+  background-image: url('duque-sprite.png');
+  background-repeat: no-repeat;
+  background-size: 700% 100%;
+  opacity: 0;
+  pointer-events: none;
+  /* duqueFadeIn's 0.7s delay / 0.9s duration are matched by hand to
+     .open-line's own GSAP reveal (`.to('.open-line', {opacity:1,y:0,
+     duration:0.9}, 0.7)` in the intro timeline below) so he appears
+     at the same moment as the "Click to open invitation" text — kept
+     as plain CSS rather than folding him into that GSAP timeline to
+     stay consistent with Oliver/the ball, which are deliberately pure
+     CSS and independent of it. If .open-line's reveal timing ever
+     changes, update these two numbers to match. */
+  animation:
+    duqueFadeIn 0.9s 0.7s ease-out forwards,
+    duqueIdle 2.5s steps(6) infinite;
+}
+@keyframes duqueFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes duqueIdle {
+  from { background-position: 0% 0; }
+  to   { background-position: 100% 0; }
+}
+
 /* ---- "Open the invitation" — bottom of the screen ---- */
 .open-line {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 8vh;
+  /* Was 8vh — raised so it clears Oliver now that he runs flush along
+     the very bottom of the screen (bottom:0) instead of floating at
+     20vh; his sprite box can be up to ~91px tall at its widest clamp,
+     which ate into the old 8vh gap. */
+  bottom: 15vh;
   text-align: center;
   font-family: 'EB Garamond', serif;
   font-style: italic;
@@ -480,7 +637,7 @@ body.revealed { visibility: visible; }
   font-family: 'EB Garamond', serif;
   font-style: italic;
   font-weight: 500;
-  font-size: clamp(0.72rem, 1.8vw, 0.92rem);
+  font-size: clamp(0.82rem, 2.05vw, 1.05rem);
   text-transform: uppercase;
   letter-spacing: 0.34em;
   color: var(--ink);
@@ -493,7 +650,7 @@ body.revealed { visibility: visible; }
   /* Same font as "Save the date" in the sky scene, for consistency
      between the two cursive moments on the page. */
   font-family: 'Mrs Saint Delafield', cursive;
-  font-size: clamp(2.8rem, 8vw, 4.6rem);
+  font-size: clamp(3.2rem, 9vw, 5.2rem);
   line-height: 1;
   color: var(--ink);
   margin-top: 0.9em;
@@ -585,7 +742,7 @@ body.revealed { visibility: visible; }
   margin-top: 1.1em;
   font-family: 'EB Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.75rem, 1.6vw, 0.85rem);
+  font-size: clamp(0.86rem, 1.85vw, 0.98rem);
   color: var(--ink);
   opacity: 0.65;
 }
@@ -656,6 +813,11 @@ body.revealed { visibility: visible; }
      the edge. dvh (not vh), matching .stage, so this doesn't drift on
      phones where the address bar changes the viewport height. */
   .open-line  { bottom: 20dvh; letter-spacing: 0.3em; }
+  /* Re-measured for this breakpoint specifically — .open-line's
+     letter-spacing drops to 0.3em here (vs 0.42em above), which
+     shifts where "invitation" actually lands; same
+     measure-don't-guess approach as the base rule. */
+  .duque-rest { bottom: 22.5dvh; left: calc(71vw - 45px); }
   .from-block { top: 9vh; }
   .save-block { top: 33%; }
   /* cover forces a wide envelope photo to fill a tall, narrow phone
@@ -704,9 +866,25 @@ body.revealed { visibility: visible; }
   .from-names .letter,
   .sky-photo,
   .sky-scrim,
-  .closing-section {
+  .closing-section,
+  .duque-rest {
     opacity: 1 !important;
     transform: none !important;
+  }
+  /* Oliver and the ball are decorative motion, not a state to freeze
+     in place — just hide them entirely for reduced-motion users. */
+  .oliver-run,
+  .ball-run {
+    display: none;
+  }
+  /* Duque is just lying there — freezing on his first frame (rather
+     than hiding him like the runners) looks like a normal static
+     illustration, not a broken animation. His base opacity is 0
+     (waiting on duqueFadeIn), so he also needs the opacity:1
+     !important above — without it, disabling his animation here would
+     leave him permanently invisible instead of frozen-visible. */
+  .duque-rest {
+    animation: none;
   }
   /* Villa now lives in the SAME .stage as the couple photo/monogram —
      without the scroll-driven animation (skipped entirely for reduced
@@ -769,7 +947,16 @@ body.revealed { visibility: visible; }
 
   <div class="envelope-photo" role="img" aria-label="Cream wedding invitation envelope with a wax seal monogrammed E and V"></div>
 
-  <div class="open-line">Open the invitation</div>
+  <!-- Ball, Oliver, and Duque: a one-time chase across the envelope
+       screen, not tied to the GSAP intro timeline — pure CSS
+       animation. Ball leads (no delay), Oliver trails 1s behind on
+       the identical path (see .oliver-run's own delay), Duque stays
+       put watching them go by. -->
+  <div class="ball-run" aria-hidden="true"></div>
+  <div class="oliver-run" aria-hidden="true"></div>
+  <div class="duque-rest" aria-hidden="true"></div>
+
+  <div class="open-line">Click to open invitation</div>
 
   <div class="from-block">
     <div class="from-eyebrow">A Love letter from</div>
@@ -809,7 +996,7 @@ body.revealed { visibility: visible; }
 <!-- Normal document flow, not sticky — appears as .stage scrolls away
      above it (see the CSS comment on .closing-section). -->
 <div class="closing-section">
-  <div class="invitation-note">Invitation to follow</div>
+  <div class="invitation-note">Formal invitation to follow</div>
 
   <div class="calendar-block">
     <!-- href/label/download set by JS based on device (Apple vs
@@ -1094,7 +1281,7 @@ window.addEventListener('scroll', () => {
 function startEnvelopeTransition() {
   const d = reduceMotion ? 0 : 1;
   gsap.timeline()
-    .to(['.envelope-photo', '.open-line', '.from-eyebrow', '.from-names .letter'], {
+    .to(['.envelope-photo', '.open-line', '.from-eyebrow', '.from-names .letter', '.oliver-run', '.ball-run', '.duque-rest'], {
       opacity: 0,
       duration: d,
       ease: 'power1.inOut'
@@ -1165,12 +1352,12 @@ document.querySelector('.stage').addEventListener('click', () => {
 const TRANSLATIONS = {
   en: {
     pageTitle: 'A Love Letter — Edgar & Vilma',
-    openLine: 'Open the invitation',
+    openLine: 'Click to open invitation',
     fromEyebrow: 'A Love letter from',
     saveTagline: 'Save The Date',
     saveDate: 'April 30th, 2027',
     scrollHint: 'Scroll for more',
-    invitationNote: 'Invitation to follow',
+    invitationNote: 'Formal invitation to follow',
     calendarBtn: 'Add to calendar',
     calendarAltGoogle: 'Prefer Google Calendar?',
     calendarAltApple: 'Prefer Apple Calendar or Outlook?',
@@ -1188,12 +1375,12 @@ const TRANSLATIONS = {
   },
   es: {
     pageTitle: 'Una Carta de Amor — Edgar & Vilma',
-    openLine: 'Abre la invitación',
+    openLine: 'Haz clic para abrir la invitación',
     fromEyebrow: 'Una carta de amor de',
     saveTagline: 'Reserva La Fecha',
     saveDate: '30 de abril de 2027',
     scrollHint: 'Desliza para ver más',
-    invitationNote: 'La invitación llegará pronto',
+    invitationNote: 'La invitación formal llegará pronto',
     calendarBtn: 'Añadir al calendario',
     calendarAltGoogle: '¿Prefieres Google Calendar?',
     calendarAltApple: '¿Prefieres Apple Calendar u Outlook?',
