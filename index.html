@@ -486,20 +486,25 @@ body.revealed { visibility: visible; }
      accelerating/decelerating at the ends. oliverRunCycle loops
      `infinite` rather than a fixed count so it isn't tied to
      oliverRunAcross's duration — change one without needing to
-     recompute the other. 1s delay on BOTH so he starts already at
-     full speed/visible (not fading in mid-stride) — he's chasing the
-     ball (see .ball-run below), which starts at 0s with the identical
-     path/speed, so this delay is what keeps him a beat behind for the
-     whole crossing rather than catching up. */
+     recompute the other. 1s delay on BOTH — he's chasing the ball
+     (see .ball-run below), which starts at 0s with a slightly faster
+     speed, so this delay is what keeps him a beat behind for the
+     whole crossing rather than catching up. Duration covers his
+     LONGER path (-28vw to 108vw = 136vw, not 108vw like the ball —
+     see the keyframes below) at roughly the same speed as the ball,
+     not just the same duration. */
   animation:
-    oliverRunAcross 7.6s 1s linear forwards,
+    oliverRunAcross 4.9s 1s linear forwards,
     oliverRunCycle 1s 1s steps(7) infinite;
 }
 @keyframes oliverRunAcross {
-  /* Starts at the left edge (not off-screen at -28vw) so he's already
-     visible in the first frame after his delay — see .ball-run for
-     why the same choice was made there. */
-  0%   { left: 0vw; opacity: 1; }
+  /* Starts off-screen at -28vw (not the left edge) so he visibly runs
+     IN from off-screen — was 0vw for a while, to fix an unrelated
+     timing bug where he stayed invisible too long relative to text
+     that no longer applies now that the ball, not text, is what he's
+     timed against. The ball has no such runway (it starts already on
+     -screen at 0vw), so only Oliver gets one here. */
+  0%   { left: -28vw; opacity: 1; }
   100% { left: 108vw; opacity: 1; }
 }
 @keyframes oliverRunCycle {
@@ -533,7 +538,7 @@ body.revealed { visibility: visible; }
   opacity: 0;
   pointer-events: none;
   animation:
-    ballRunAcross 7.3s linear forwards,
+    ballRunAcross 3.6s linear forwards,
     /* alternate (not infinite-forward-only): the 8 frames trace ONE
        downward bounce, not a circular loop — playing forward then
        backward through them gives a smooth down/up bounce instead of
@@ -580,21 +585,20 @@ body.revealed { visibility: visible; }
   background-size: 700% 100%;
   opacity: 0;
   pointer-events: none;
-  /* duqueFadeIn's 0.7s delay / 0.9s duration are matched by hand to
-     .open-line's own GSAP reveal (`.to('.open-line', {opacity:1,y:0,
-     duration:0.9}, 0.7)` in the intro timeline below) so he appears
-     at the same moment as the "Click to open invitation" text — kept
-     as plain CSS rather than folding him into that GSAP timeline to
-     stay consistent with Oliver/the ball, which are deliberately pure
-     CSS and independent of it. If .open-line's reveal timing ever
-     changes, update these two numbers to match. */
-  animation:
-    duqueFadeIn 0.9s 0.7s ease-out forwards,
-    duqueIdle 2.5s steps(6) infinite;
-}
-@keyframes duqueFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  /* Unlike Oliver/the ball, Duque's opacity is GSAP-controlled, not a
+     CSS keyframe — see introTl below, where he fades in alongside
+     .open-line at the same 0.7s/0.9s timing. Tried a pure-CSS
+     `duqueFadeIn` animation with `forwards` fill first, matching
+     Oliver/the ball's independence from GSAP, but a CSS animation
+     holding a property via `forwards` keeps overriding it even after
+     the animation finishes — which silently broke his fade-OUT on
+     click (GSAP's inline opacity:0 was getting overridden right back
+     to 1 by the still-active `forwards` fill). Since he needs both a
+     GSAP-driven fade-out on click AND a synced fade-in, opacity has to
+     live entirely in GSAP; only the idle background-position loop
+     below stays pure CSS (harmless — GSAP never touches that
+     property). */
+  animation: duqueIdle 2.5s steps(6) infinite;
 }
 @keyframes duqueIdle {
   from { background-position: 0% 0; }
@@ -879,10 +883,11 @@ body.revealed { visibility: visible; }
   }
   /* Duque is just lying there — freezing on his first frame (rather
      than hiding him like the runners) looks like a normal static
-     illustration, not a broken animation. His base opacity is 0
-     (waiting on duqueFadeIn), so he also needs the opacity:1
-     !important above — without it, disabling his animation here would
-     leave him permanently invisible instead of frozen-visible. */
+     illustration, not a broken animation. His base opacity is 0,
+     normally raised to 1 by introTl below — but that whole timeline
+     is skipped for reduced-motion (see the `if` around it), so he
+     also needs the opacity:1 !important above; without it he'd stay
+     permanently invisible instead of frozen-visible. */
   .duque-rest {
     animation: none;
   }
@@ -1220,6 +1225,28 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     }
   });
 
+  // "Scroll for more" — first attempt tied this to the master villa
+  // timeline above (scrub-linked, fading out over its last stretch,
+  // ending exactly when that timeline reached its own end). Wrong
+  // anchor: .scroll-spacer's actual scroll distance runs longer than
+  // the villa content needs to finish animating, so that fired while
+  // .stage was still pinned and .closing-section (the calendar/
+  // countdown) hadn't appeared yet — the hint vanished while there was
+  // still real content ahead, exactly the "gone before I've even seen
+  // the calendar" complaint it was meant to avoid. Tied to the SAME
+  // trigger as .closing-section's own reveal instead, so it only fades
+  // once the calendar section has actually started coming into view.
+  gsap.to('.scroll-hint', {
+    opacity: 0,
+    duration: 0.6,
+    ease: 'power1.out',
+    scrollTrigger: {
+      trigger: '.closing-section',
+      start: 'top 85%',
+      toggleActions: 'play none none reverse'
+    }
+  });
+
   /*
     Simple page-load sequence (no scroll yet — first beat of what will
     grow into a longer scroll-driven piece later):
@@ -1240,6 +1267,10 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
 
   introTl.to('.envelope-photo', { opacity: 1, scale: 1, duration: 1.1 }, 0)
     .to('.open-line', { opacity: 1, y: 0, duration: 0.9 }, 0.7)
+    // Duque fades in alongside "Click to open invitation" — same
+    // start time and duration as the tween above, so he settles in
+    // with the text rather than appearing on his own separate beat.
+    .to('.duque-rest', { opacity: 1, duration: 0.9 }, 0.7)
     .to('.from-eyebrow', { opacity: 1, duration: 0.7 }, 0.9)
     // Per-letter "writing" reveal — each character of "Edgar & Vilma"
     // fades in on its own, staggered, rather than the whole name
