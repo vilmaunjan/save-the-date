@@ -415,7 +415,22 @@ body.revealed { visibility: visible; }
 
 .save-tagline {
   font-family: 'Mrs Saint Delafield', cursive;
-  font-size: clamp(4.4rem, 14vw, 7.4rem);
+  /* Was clamp(4.4rem, 14vw, 7.4rem) — both numbers measured wrong for
+     two different reasons, found by actually rendering the text and
+     measuring it (Range.getBoundingClientRect), not eyeballing it:
+     (1) the 4.4rem FLOOR was tuned against "Save The Date" on phone,
+     but "Reserva La Fecha" renders ~18% wider in this cursive font at
+     the same size — at 4.4rem/375px wide it measured 374.5px wide,
+     essentially touching both edges (0.47px to spare). 3.8rem gives
+     it real margin (~26px/side at 375px) without the English version
+     getting noticeably smaller. (2) the 14vw coefficient hit its own
+     7.4rem CAP at only ~846px width — meaning an iPad (744-1024px
+     portrait) was getting nearly full desktop-max text size with far
+     less width to fit it in than an actual desktop window has. 9vw
+     doesn't reach the cap until ~1315px, so tablets scale down
+     properly with their actual available width instead of ballooning
+     toward the same ceiling desktop uses. */
+  font-size: clamp(3.8rem, 9vw, 7.4rem);
   line-height: 1;
   color: var(--ink);
   margin-bottom: 0.5em;
@@ -424,8 +439,14 @@ body.revealed { visibility: visible; }
 .save-date {
   font-family: 'EB Garamond', serif;
   font-weight: 500;
-  /* Was clamp(1.1rem, 2.8vw, 1.5rem) — bumped up per feedback. */
-  font-size: clamp(1.4rem, 3.6vw, 1.95rem);
+  /* Was clamp(1.1rem, 2.8vw, 1.5rem), then clamp(1.4rem, 3.6vw,
+     1.95rem) — the 3.6vw coefficient had the same "reaches its cap
+     too early" problem as .save-tagline above (~867px), just less
+     visually severe since this line is smaller. Floor measured safe
+     on phone already (both languages, ~317px/282px wide at 375px
+     viewport), so only the coefficient needed lowering — 2.3vw
+     doesn't reach the 1.95rem cap until ~1356px. */
+  font-size: clamp(1.4rem, 2.3vw, 1.95rem);
   text-transform: uppercase;
   letter-spacing: 0.38em;
   color: var(--ink);
@@ -537,8 +558,11 @@ body.revealed { visibility: visible; }
   background-size: 800% 100%;
   opacity: 0;
   pointer-events: none;
+  /* No delay on either animation — the ball starts moving and
+     bouncing the instant the page loads, unlike Oliver (1s delay,
+     see .oliver-run). */
   animation:
-    ballRunAcross 3.6s linear forwards,
+    ballRunAcross 4.53s linear forwards,
     /* alternate (not infinite-forward-only): the 8 frames trace ONE
        downward bounce, not a circular loop — playing forward then
        backward through them gives a smooth down/up bounce instead of
@@ -546,7 +570,12 @@ body.revealed { visibility: visible; }
     ballBounce 0.6s steps(7) infinite alternate;
 }
 @keyframes ballRunAcross {
-  0%   { left: 0vw; opacity: 1; }
+  /* Starts off-screen at -28vw, matching Oliver's own entrance point
+     (was 0vw — already on-screen at load). Duration recalculated to
+     hold the same ~30vw/s speed over the now-longer 136vw path
+     (-28vw to 108vw, was 108vw) rather than just keeping the old 3.6s
+     and quietly changing his actual speed. */
+  0%   { left: -28vw; opacity: 1; }
   100% { left: 108vw; opacity: 1; }
 }
 @keyframes ballBounce {
@@ -833,31 +862,44 @@ body.revealed { visibility: visible; }
      letterboxed strip reads as more envelope, not empty page. */
   .envelope-photo { background-size: contain; }
 
-  /* Side-by-side (villa right, text center-ish) works on desktop
-     because there's enough width for both — on a narrow phone, villa's
-     size (60vw of a much smaller screen) collides with the text
-     instead. Moving it down and centering it horizontally puts it
-     BELOW the text rather than beside it, at this width only; desktop
-     keeps the original right:6vw/top:50% side-by-side layout untouched.
-     left:0/right:0/margin:auto (not a transform-based x-offset) is what
-     actually centers it — GSAP's x tween ends at exactly 0%, so the
-     resting position has to already BE centered with zero extra x
-     applied, which margin:auto gives for free without needing a
-     compensating transform value. transform here only handles vertical
-     centering (translateY) plus the same 150% off-screen starting
-     offset as desktop — GSAP's x tween still slides it in from the
-     right, it just lands lower and centered instead of at the right
-     edge, mid-height. */
+}
+
+/* ---- VILLA BELOW TEXT: phones AND tablets (not just phones) ----
+   Was folded into the max-width:480px phone block above with the
+   villa-image rule living there too — but an iPad (744-1024px
+   portrait) isn't caught by that breakpoint at all, so it was getting
+   the DESKTOP side-by-side layout (villa right:6vw, beside the text)
+   meant for genuinely wide windows. At tablet widths that's nowhere
+   near enough room: villa's zoomed size (scale 1.4 via GSAP) plus
+   right-anchoring pushed it clean off the right edge of an actual
+   iPad, while overlapping the tagline text directly — confirmed with
+   real measurements at 820px width (villa's right edge landed 49px
+   past the viewport edge, tagline text 354px deep inside villa's own
+   box). Centering it below the text instead of beside it fixes the
+   horizontal collision, but sizing it with `vw` (like the old
+   phone-only 62vw, and a first attempt at 44vw here) doesn't work
+   across the tablet range — the thing that actually constrains villa
+   here is fitting in the VERTICAL band between the date text above
+   and .villa-caption below, and that band's size is driven by
+   viewport HEIGHT (top%/bottom:vh values), not width. A width tuned
+   to fit at one aspect ratio (744x1133) overlapped at another
+   (1024x1366) despite both being "tablet width" — confirmed by
+   directly measuring the gap on both sides of villa, not just eyeballing
+   it. Sizing with `vh` instead ties villa's size to the same axis as
+   the constraint, and one value (24vh) holds up with real margin
+   across the actual range tested: 375/744/820/1024px wide (this
+   replaces the old phone-only rule too, not just adds a tablet one),
+   heights 812/1133/1180/1366 — swept top% and width independently at
+   each before landing on top:66% + width:24vh as the combination that
+   clears both edges everywhere tested. */
+@media (max-width: 1024px) {
   .villa-image {
-    /* Was 82%, then 66% — same reason as the desktop rule above: the
-       bigger scale-1.4 zoom was overlapping .villa-caption at the
-       bottom. Moved up further to 56%. */
-    top: 56%;
+    top: 66%;
     left: 0;
     right: 0;
     margin: 0 auto;
     transform: translateY(-50%) translateX(150%);
-    width: 62vw;
+    width: 24vh;
     max-width: none;
   }
 }
@@ -1120,22 +1162,27 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
   // scroll distance, so .scroll-spacer's height (170dvh, also shrunk to
   // match) doesn't leave a stretch of scroll at the end where nothing's
   // actually still happening.
-  // On mobile the villa moved below the text instead of beside it (see
-  // the @media block for .villa-image), so there's no longer anything
-  // for the text to make room for by shifting left — and -22vw was
-  // tuned against a wide desktop screen, so on a narrow phone that same
-  // distance pushes the text far enough left to clip against .stage's
-  // overflow:hidden. isMobileLayout picks 0 there instead.
-  const isMobileLayout = window.matchMedia('(max-width: 480px)').matches;
-  const saveBlockShift = isMobileLayout ? '0vw' : '-22vw';
-  // Mobile-only: as the villa enlarges below the text (see the @media
-  // block — villa sits below, not beside, on mobile), the save-block
-  // was just sitting still at its original spot, leaving a noticeable
-  // gap of empty space above it once the villa took up the bottom
-  // portion of the screen. Rising slightly tightens that up. 0 on
-  // desktop — the save-block already shifts left there instead, no
-  // vertical gap to fix.
-  const saveBlockRise = isMobileLayout ? '-9vh' : '0vh';
+  // On phone AND tablet the villa moves below the text instead of
+  // beside it (see the max-width:1024px block for .villa-image), so
+  // there's no longer anything for the text to make room for by
+  // shifting left — and -22vw was tuned against a wide desktop screen;
+  // at anything narrower that same distance pushes the text far enough
+  // left to clip against .stage's overflow:hidden (confirmed on an
+  // 820px-wide iPad: the Spanish tagline's left edge landed 76px past
+  // the viewport edge). Was gated at max-width:480px (phone only) —
+  // widened to 1024px to match the villa-image breakpoint above, since
+  // an ungated -22vw at tablet widths was exactly what caused the
+  // overflow this whole fix is for.
+  const isNarrowLayout = window.matchMedia('(max-width: 1024px)').matches;
+  const saveBlockShift = isNarrowLayout ? '0vw' : '-22vw';
+  // As the villa enlarges below the text (see the max-width:1024px
+  // block — villa sits below, not beside, at this width), the
+  // save-block was just sitting still at its original spot, leaving a
+  // noticeable gap of empty space above it once the villa took up the
+  // bottom portion of the screen. Rising slightly tightens that up. 0
+  // above 1024px — the save-block already shifts left there instead,
+  // no vertical gap to fix.
+  const saveBlockRise = isNarrowLayout ? '-9vh' : '0vh';
 
   gsap.timeline({
     scrollTrigger: {
