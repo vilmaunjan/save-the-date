@@ -1,0 +1,17 @@
+{
+  "name": "save-the-date",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:visual": "node tests/visual-regression.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "http-server": "14.1.1",
+    "pixelmatch": "7.1.0",
+    "pngjs": "7.0.0"
+  }
+}
