@@ -17,8 +17,10 @@ async function waitForAnimationLibrary(page: Page) {
 
 test.describe('save-the-date invitation', () => {
   test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     await expect(page.locator('.stage')).toBeVisible();
+    await waitForAnimationLibrary(page);
   });
 
   test('renders the initial invitation without horizontal clipping', async ({ page }) => {
@@ -29,9 +31,6 @@ test.describe('save-the-date invitation', () => {
   });
 
   test('opens the invitation and unlocks scrolling', async ({ page }) => {
-    await waitForAnimationLibrary(page);
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-
     await page.locator('.stage').click({ position: { x: 10, y: 10 } });
 
     await expect(page.locator('body')).toHaveClass(/unlocked/);
@@ -43,8 +42,6 @@ test.describe('save-the-date invitation', () => {
   });
 
   test('supports scrolling through the revealed experience', async ({ page }) => {
-    await waitForAnimationLibrary(page);
-    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.locator('.stage').click({ position: { x: 10, y: 10 } });
     await expect(page.locator('body')).toHaveClass(/unlocked/);
 
@@ -54,8 +51,6 @@ test.describe('save-the-date invitation', () => {
   });
 
   test('a second click does not restart the invitation transition', async ({ page }) => {
-    await waitForAnimationLibrary(page);
-    await page.emulateMedia({ reducedMotion: 'reduce' });
     const stage = page.locator('.stage');
 
     await stage.click({ position: { x: 10, y: 10 } });
