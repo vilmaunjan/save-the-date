@@ -933,10 +933,10 @@ body.revealed { visibility: visible; }
     font-size: clamp(2.2rem, 6vw, 3.5rem);
   }
   .save-block {
-    left: 5vw;
-    right: auto;
+    left: 0;
+    right: 0;
     top: 32%;
-    width: 55vw;
+    width: auto;
   }
   .save-eyebrow {
     font-size: clamp(0.7rem, 1.7vw, 0.9rem);
@@ -1349,7 +1349,7 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
   // overflow this whole fix is for.
   const isPhoneLandscape = window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 1000px)').matches;
   const isNarrowLayout = window.matchMedia('(max-width: 1024px)').matches && !isPhoneLandscape;
-  const saveBlockShift = isNarrowLayout ? '0vw' : (isPhoneLandscape ? '-4vw' : '-22vw');
+  const saveBlockShift = isNarrowLayout ? '0vw' : (isPhoneLandscape ? '-20vw' : '-22vw');
   // As the villa enlarges below the text (see the max-width:1024px
   // block — villa sits below, not beside, at this width), the
   // save-block was just sitting still at its original spot, leaving a
