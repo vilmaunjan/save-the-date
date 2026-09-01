@@ -23,31 +23,31 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import re
 
           path = Path('index.html')
           text = path.read_text()
 
-          old_css = """  .save-block {
-            left: 5vw;
-            right: auto;
-            top: 32%;
-            width: 55vw;
-          }"""
-          new_css = """  .save-block {
-            /* Start exactly centered like portrait/mobile. The GSAP
-               timeline moves the full-width block left only once the
-               villa transition begins. */
-            left: 0;
-            right: 0;
-            top: 32%;
-            width: auto;
-          }"""
-          if old_css not in text:
-              raise SystemExit('Could not find landscape .save-block rule')
-          text = text.replace(old_css, new_css, 1)
+          landscape_start = text.index('@media (orientation: landscape) and (max-height: 500px) and (max-width: 1000px) {')
+          landscape_end = text.index('/* ---- VILLA BELOW TEXT:', landscape_start)
+          landscape = text[landscape_start:landscape_end]
 
-          old_js = """  const saveBlockShift = isNarrowLayout ? '0vw' : (isPhoneLandscape ? '-4vw' : '-22vw');"""
-          new_js = """  const saveBlockShift = isNarrowLayout ? '0vw' : (isPhoneLandscape ? '-20vw' : '-22vw');"""
+          pattern = re.compile(r"  \.save-block \{\s*left: 5vw;\s*right: auto;\s*top: 32%;\s*width: 55vw;\s*\}", re.S)
+          replacement = """  .save-block {
+    /* Start exactly centered like portrait/mobile. The GSAP timeline
+       moves the full-width block left only once the villa transition begins. */
+    left: 0;
+    right: 0;
+    top: 32%;
+    width: auto;
+  }"""
+          landscape, count = pattern.subn(replacement, landscape, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected one landscape .save-block rule, found {count}')
+          text = text[:landscape_start] + landscape + text[landscape_end:]
+
+          old_js = "const saveBlockShift = isNarrowLayout ? '0vw' : (isPhoneLandscape ? '-4vw' : '-22vw');"
+          new_js = "const saveBlockShift = isNarrowLayout ? '0vw' : (isPhoneLandscape ? '-20vw' : '-22vw');"
           if old_js not in text:
               raise SystemExit('Could not find landscape saveBlockShift')
           text = text.replace(old_js, new_js, 1)
