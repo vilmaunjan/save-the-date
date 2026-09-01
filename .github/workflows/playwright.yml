@@ -12,7 +12,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out current branch
+        uses: actions/checkout@v4
+
+      - name: Check out master baseline
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          path: visual-baseline
 
       - uses: actions/setup-node@v4
         with:
@@ -26,6 +33,17 @@ jobs:
 
       - name: Run Playwright tests
         run: npm test
+
+      - name: Run visual regression against master
+        shell: bash
+        run: |
+          npx http-server visual-baseline -p 4173 -c-1 > /tmp/visual-baseline.log 2>&1 &
+          BASE_SERVER_PID=$!
+          npx http-server . -p 4174 -c-1 > /tmp/visual-current.log 2>&1 &
+          CURRENT_SERVER_PID=$!
+          trap 'kill $BASE_SERVER_PID $CURRENT_SERVER_PID 2>/dev/null || true' EXIT
+          sleep 2
+          npm run test:visual
 
       - name: Upload Playwright report
         if: always()
@@ -41,4 +59,12 @@ jobs:
         with:
           name: playwright-test-results
           path: test-results/
+          retention-days: 14
+
+      - name: Upload visual regression artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-results
+          path: visual-regression-results/
           retention-days: 14
