@@ -16,20 +16,22 @@ const targets = [
   { name: 'ipad-mini', context: { ...devices['iPad Mini'] } },
 ];
 
+async function loadStable(page) {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await page.waitForSelector('.stage');
+  await page.evaluate(() => document.fonts.ready);
+}
+
 const states = [
   {
     name: 'initial',
-    prepare: async (page) => {
-      await page.goto('/', { waitUntil: 'networkidle' });
-      await page.waitForSelector('.stage');
-    },
+    prepare: loadStable,
   },
   {
     name: 'opened',
     prepare: async (page) => {
-      await page.emulateMedia({ reducedMotion: 'reduce' });
-      await page.goto('/', { waitUntil: 'networkidle' });
-      await page.waitForSelector('.stage');
+      await loadStable(page);
       await page.locator('.stage').click({ position: { x: 12, y: 12 } });
       await page.waitForFunction(() => document.body.classList.contains('unlocked'));
     },
@@ -37,9 +39,7 @@ const states = [
   {
     name: 'scrolled',
     prepare: async (page) => {
-      await page.emulateMedia({ reducedMotion: 'reduce' });
-      await page.goto('/', { waitUntil: 'networkidle' });
-      await page.waitForSelector('.stage');
+      await loadStable(page);
       await page.locator('.stage').click({ position: { x: 12, y: 12 } });
       await page.waitForFunction(() => document.body.classList.contains('unlocked'));
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -59,8 +59,8 @@ try {
   for (const target of targets) {
     for (const state of states) {
       const safeName = `${target.name}-${state.name}`;
-      const baseContext = await browser.newContext(target.context);
-      const currentContext = await browser.newContext(target.context);
+      const baseContext = await browser.newContext({ ...target.context, baseURL });
+      const currentContext = await browser.newContext({ ...target.context, baseURL: currentURL });
       const basePage = await baseContext.newPage();
       const currentPage = await currentContext.newPage();
 
