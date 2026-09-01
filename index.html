@@ -900,6 +900,87 @@ body.revealed { visibility: visible; }
 
 }
 
+/* ---- MOBILE LANDSCAPE ----
+   A phone turned sideways is wide but very short, so the portrait
+   "villa below the text" composition becomes vertically cramped.
+   Use the available horizontal room instead: keep the save text on
+   the left, put the villa on the right, and tighten purely decorative
+   vertical elements. The max-height guard keeps this from changing
+   iPad/tablet landscape layouts. */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 1000px) {
+  .from-block { top: 5dvh; }
+  .from-eyebrow { margin-bottom: 1em; }
+  .from-names {
+    margin-top: 0.25em;
+    font-size: clamp(2.6rem, 8vw, 4.2rem);
+  }
+  .open-line {
+    bottom: 6dvh;
+    font-size: clamp(0.72rem, 1.8vw, 0.95rem);
+    letter-spacing: 0.28em;
+  }
+  .duque-rest {
+    bottom: 9dvh;
+    left: calc(68vw - 45px);
+    width: clamp(70px, 15vw, 105px);
+  }
+  .envelope-photo { background-size: contain; }
+  .monogram {
+    top: 13%;
+    width: clamp(76px, 12vw, 110px);
+  }
+  .monogram .mono-letter {
+    font-size: clamp(2.2rem, 6vw, 3.5rem);
+  }
+  .save-block {
+    left: 5vw;
+    right: auto;
+    top: 32%;
+    width: 55vw;
+  }
+  .save-eyebrow {
+    font-size: clamp(0.7rem, 1.7vw, 0.9rem);
+    margin-bottom: 0.45em;
+  }
+  .save-tagline {
+    font-size: clamp(3rem, 8vw, 5.2rem);
+    margin-bottom: 0.25em;
+  }
+  .save-date {
+    font-size: clamp(0.82rem, 1.8vw, 1.2rem);
+    letter-spacing: 0.3em;
+  }
+  .villa-image {
+    top: 50%;
+    left: auto;
+    right: 4vw;
+    margin: 0;
+    width: min(34vw, 62dvh);
+    max-width: none;
+    transform: translateY(-50%) translateX(180%);
+  }
+  .villa-caption {
+    left: auto;
+    right: 5vw;
+    bottom: 5dvh;
+    width: 36vw;
+    font-size: clamp(0.82rem, 1.8vw, 1.1rem);
+    letter-spacing: 0.28em;
+  }
+  .scroll-hint {
+    bottom: 2.5dvh;
+    font-size: 0.72rem;
+  }
+  .closing-section {
+    min-height: 100dvh;
+    gap: 1.25rem;
+    padding-top: 2rem;
+  }
+  .countdown-num {
+    font-size: clamp(1.7rem, 5vw, 2.4rem);
+  }
+}
+
 /* ---- VILLA BELOW TEXT: phones AND tablets (not just phones) ----
    Was folded into the max-width:480px phone block above with the
    villa-image rule living there too — but an iPad (744-1024px
@@ -1251,8 +1332,9 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
   // widened to 1024px to match the villa-image breakpoint above, since
   // an ungated -22vw at tablet widths was exactly what caused the
   // overflow this whole fix is for.
-  const isNarrowLayout = window.matchMedia('(max-width: 1024px)').matches;
-  const saveBlockShift = isNarrowLayout ? '0vw' : '-22vw';
+  const isPhoneLandscape = window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 1000px)').matches;
+  const isNarrowLayout = window.matchMedia('(max-width: 1024px)').matches && !isPhoneLandscape;
+  const saveBlockShift = isNarrowLayout ? '0vw' : (isPhoneLandscape ? '-4vw' : '-22vw');
   // As the villa enlarges below the text (see the max-width:1024px
   // block — villa sits below, not beside, at this width), the
   // save-block was just sitting still at its original spot, leaving a
