@@ -1030,6 +1030,21 @@ body.revealed { visibility: visible; }
   }
 }
 
+/* Landscape-phone villa override must come AFTER the generic
+   max-width:1024px portrait/tablet rule above so CSS source order does
+   not pull the villa back underneath the text. */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 1000px) {
+  .villa-image {
+    top: 50%;
+    left: auto;
+    right: 4vw;
+    margin: 0;
+    width: min(34vw, 62dvh);
+    max-width: none;
+    transform: translateY(-50%) translateX(180%);
+  }
+}
+
 /* ---- LANDSCAPE iPAD: keep desktop's side-by-side layout, shrink villa ----
    Landscape iPads (1025-1366px wide) already fall through to the
    plain desktop .villa-image rule below, since they're wider than the
