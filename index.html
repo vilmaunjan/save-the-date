@@ -37,6 +37,22 @@
   inherits: false;
   initial-value: 0%;
 }
+/* Registers the two unitless 0→1 GSAP-animated drivers for the
+   save-block scroll shift. GSAP tweens these from 0 to 1; the actual
+   distances (--shift-x, --shift-y) live in CSS media queries and are
+   multiplied in via calc() in the .save-block rule below. Without
+   @property, GSAP would treat these as opaque strings and refuse to
+   interpolate them as numbers. */
+@property --shift-px {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+@property --shift-py {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
 
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -435,6 +451,16 @@ body.revealed { visibility: visible; }
   top: 36%;
   text-align: center;
   will-change: transform;
+  /* Desktop (>1024px) shift values. Narrow-portrait and phone-landscape
+     overrides live in the matching media-query blocks below.
+     GSAP tweens --shift-px and --shift-py from 0→1 (unitless drivers);
+     the actual distances are supplied here by --shift-x / --shift-y
+     and multiplied in via calc(). This lets CSS media queries re-evaluate
+     the distances live on rotation without any JS invalidation. */
+  --shift-x: -22vw;
+  --shift-y: 0vh;
+  transform: translate(calc(var(--shift-x) * var(--shift-px)),
+                       calc(var(--shift-y) * var(--shift-py)));
 }
 
 /* Small tracked-caps line above the cursive tagline. Originally
@@ -522,7 +548,8 @@ body.revealed { visibility: visible; }
   /* iPhone-specific: reported flickering "as it enters or exits" —
      matches a known iOS Safari bug class where large text inside a
      position:sticky section that ALSO gets its own transform tween
-     (see .save-block's GSAP x/y shift in the scroll timeline below)
+     (see .save-block's GSAP --shift-px/--shift-py driver tweens in
+     the scroll timeline below, which CSS calc()s into a transform)
      loses stable GPU-layer compositing right at the pin's entry/exit
      boundaries, causing a visible repaint flicker. .from-names uses
      the identical cursive font but isn't scroll-transform-driven at
@@ -1146,6 +1173,16 @@ body.revealed { visibility: visible; }
     width: 24vh;
     max-width: none;
   }
+  /* Narrow portrait/tablet (<=1024px, not phone landscape): no
+     horizontal shift (villa is below, not beside the text), and a
+     slight rise to close the gap the villa creates underneath.
+     Phone-landscape overrides these further down in source order,
+     since max-width:1000px is a subset of max-width:1024px and the
+     later rule wins on cascade. */
+  .save-block {
+    --shift-x: 0vw;
+    --shift-y: -9vh;
+  }
 }
 
 /* Landscape-phone villa override must come AFTER the generic
@@ -1178,6 +1215,17 @@ body.revealed { visibility: visible; }
        If this isn't actually the cause, the screenshot would help
        narrow it down properly instead of guessing again. */
     filter: drop-shadow(0 8px 16px rgba(30, 20, 10, 0.22));
+  }
+  /* Phone landscape: villa is beside the text (right side), so the
+     text shifts left like on desktop — but the available width is
+     narrower so -20vw rather than -22vw. No vertical rise needed.
+     This block must come AFTER the max-width:1024px block above so
+     it wins on cascade (both blocks match a landscape phone, and
+     max-width:1000px is a subset of max-width:1024px — later source
+     order is the tiebreaker). */
+  .save-block {
+    --shift-x: -20vw;
+    --shift-y: 0vh;
   }
 }
 
@@ -1483,36 +1531,26 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
   // widened to 1024px to match the villa-image breakpoint above, since
   // an ungated -22vw at tablet widths was exactly what caused the
   // overflow this whole fix is for.
-  // FUNCTIONS, not one-time consts — these used to be computed once
-  // at page load and baked into the tweens below as fixed strings.
-  // That broke on rotation: CSS media queries always re-evaluate live,
-  // so villa's position/size correctly updated for landscape, but this
-  // JS-computed shift value stayed frozen at whatever it was when the
-  // page first loaded (nearly always portrait, since that's the
-  // default orientation) — reported as "the text feels like it's
-  // staying centered" even though villa had correctly moved for
-  // landscape. GSAP re-invokes function-based tween values whenever
-  // the timeline is invalidated (see the resize/orientationchange
-  // listener below), so these now track the CURRENT orientation
-  // instead of the load-time one.
-  const isPhoneLandscape = () => window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 1000px)').matches;
-  const isNarrowLayout = () => window.matchMedia('(max-width: 1024px)').matches && !isPhoneLandscape();
-  const saveBlockShift = () => isNarrowLayout() ? '0vw' : (isPhoneLandscape() ? '-20vw' : '-22vw');
-  // As the villa enlarges below the text (see the max-width:1024px
-  // block — villa sits below, not beside, at this width), the
-  // save-block was just sitting still at its original spot, leaving a
-  // noticeable gap of empty space above it once the villa took up the
-  // bottom portion of the screen. Rising slightly tightens that up. 0
-  // above 1024px — the save-block already shifts left there instead,
-  // no vertical gap to fix.
-  const saveBlockRise = () => isNarrowLayout() ? '-9vh' : '0vh';
-
-  // Assigned to a variable (not a bare chain) so the resize/
-  // orientationchange listener further down can call .invalidate() on
-  // it — that's what makes the function-based x/y values below
-  // actually get re-evaluated after a rotation, instead of just
-  // sitting there unused.
-  const villaTl = gsap.timeline({
+  //
+  // BREAKPOINT VALUES NOW LIVE IN CSS MEDIA QUERIES, not JS.
+  // CSS media queries re-evaluate live on every resize/rotation, so
+  // the correct --shift-x / --shift-y is always current with no JS
+  // involvement. GSAP now tweens two unitless 0→1 drivers (--shift-px,
+  // --shift-py) registered via @property; the transform is assembled
+  // in CSS via calc(). Two separate drivers preserve the two different
+  // tween start times (2.2 for x, 3.0 for y) that were present in the
+  // old function-based tweens.
+  //
+  // Previous approach: JS helper functions (isPhoneLandscape, isNarrowLayout,
+  // saveBlockShift, saveBlockRise) fed the tween values directly, and a
+  // villaTl.invalidate() resize listener re-evaluated them after rotation.
+  // invalidate() was the bug: it re-baselined every tween's start values from
+  // the live mid-animation DOM (replacing "start = rest position" with
+  // "start = wherever the animation currently is"), so scrolling back up left
+  // the scene frozen at whatever transform it had reached mid-scroll. It fired
+  // during ordinary phone scrolling because address-bar collapse dispatches
+  // resize — not just on deliberate orientation changes.
+  gsap.timeline({
     scrollTrigger: {
       trigger: '.scroll-spacer',
       start: 'top bottom',
@@ -1568,34 +1606,21 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     .to('.villa-image', { scale: 1.4, ease: 'none', duration: 2.5 }, 3.0)
     // .monogram deliberately left out here — stays centered while only
     // the save-block text shifts left, per feedback (desktop only —
-    // saveBlockShift is 0 on mobile, see above). Ends at 5.5 now too,
-    // matching the zoom's new, shorter end point.
-    .to('.save-block', { x: saveBlockShift, ease: 'none', duration: 3.3 }, 2.2)
+    // --shift-x is 0vw on mobile, see the CSS media queries). Ends at
+    // 5.5, matching the zoom's end point.
+    // Tweens the unitless 0→1 x-driver; the actual distance comes from
+    // --shift-x in CSS (set per breakpoint). Two separate drivers (not
+    // one) because the x and y tweens have deliberately different
+    // start times (2.2 vs 3.0) that must be preserved independently.
+    .to('.save-block', { '--shift-px': 1, ease: 'none', duration: 3.3 }, 2.2)
     // Separate tween (not merged into the one above) because it's
     // timed differently — starts at 3.0, matching the villa's zoom,
-    // not 2.2 like the horizontal shift. 0 on desktop, so harmless
-    // there. Ends at 5.5, same as the zoom.
-    .to('.save-block', { y: saveBlockRise, ease: 'none', duration: 2.5 }, 3.0)
+    // not 2.2 like the horizontal shift. --shift-y is 0vh on desktop
+    // so harmless there. Ends at 5.5, same as the zoom.
+    .to('.save-block', { '--shift-py': 1, ease: 'none', duration: 2.5 }, 3.0)
     // Shifted along with the zoom above (now 3.0), so it still appears
     // the instant the zoom starts. Ends at 5.5, in step with the zoom.
     .to('.villa-caption', { opacity: 1, ease: 'none', duration: 2.5 }, 3.0);
-
-  // Rotating a phone/tablet mid-visit doesn't reload the page, but it
-  // DOES change which branch saveBlockShift/saveBlockRise/etc. should
-  // return — invalidate() clears the timeline's cached start values
-  // (forcing it to re-call those functions for fresh ones) and
-  // ScrollTrigger.refresh() recalculates pin/scroll-distance math
-  // against the new dimensions. 150ms debounce because orientation
-  // change can fire resize multiple times in quick succession as the
-  // browser chrome/address bar settles into its new layout.
-  let orientationDebounce;
-  window.addEventListener('resize', () => {
-    clearTimeout(orientationDebounce);
-    orientationDebounce = setTimeout(() => {
-      villaTl.invalidate();
-      ScrollTrigger.refresh();
-    }, 150);
-  });
 
   // .closing-section: a plain fade+rise the moment it scrolls into
   // view, not tied to the master timeline above — it's not part of the
