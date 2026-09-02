@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>A Love Letter — Edgar &amp; Vilma</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -96,6 +96,32 @@ body {
 }
 body.unlocked { overflow: auto; }
 body.revealed { visibility: visible; }
+
+/* Wraps .stage + .scroll-spacer. Given a background purely so the
+   strip revealed when a phone's browser bars slide away is filled.
+   .stage is 100svh - the height with the bars SHOWING - deliberately,
+   because svh never changes mid-gesture and GSAP caches its pin math
+   once (dvh growing out from under those cached boundaries is the old
+   "extra scroll" bug). The cost of that correct choice is that when the
+   bars retract the window gets taller while .stage does not, exposing
+   whatever is underneath below it.
+
+   Before, that was html/body's parchment (#F7F1E4) sitting directly
+   under the envelope screen's cream (#EDE4DB) - a visible colour break
+   right where the bottom bar used to be, reported as content looking
+   cut off above the bars. Painting this wrapper instead means the strip
+   always matches whatever screen is above it.
+
+   Two colours because the two screens differ: cream while the envelope
+   is closed, parchment once it opens, since .sky-bg's gradient already
+   resolves to parchment by 65% so the strip becomes invisible there.
+   Transitioned rather than swapped so it moves with the 1.2s reveal
+   crossfade instead of popping at the end of it. */
+.couple-villa-scroll {
+  background: var(--envelope-cream);
+  transition: background-color 1.2s ease;
+}
+body.unlocked .couple-villa-scroll { background: var(--parchment); }
 
 /* ---- STAGE: fills the first viewport (envelope intro + sky-scene reveal) ---- */
 .stage {
@@ -878,7 +904,15 @@ body.revealed { visibility: visible; }
   align-items: center;
   justify-content: flex-start;
   gap: clamp(2rem, 6vw, 3.5rem);
-  padding: 3rem 1.5rem 4rem;
+  /* Bottom padding adds the home-indicator inset on top of its own 4rem
+     so the countdown never sits under it. env() only returns real values
+     now that the viewport meta carries viewport-fit=cover; before that it
+     resolved to 0 everywhere, which is why the two env() calls on
+     .lang-toggle below were silently falling back to their 16px floors.
+     Note this handles the PHYSICAL home indicator only - Safari's
+     retracting toolbar is not an inset and is not reported by env();
+     that is what the svh/lvh choice above deals with. */
+  padding: 3rem 1.5rem calc(4rem + env(safe-area-inset-bottom, 0px));
   text-align: center;
   background: var(--parchment);
   opacity: 0;
@@ -1737,13 +1771,34 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
   // an intermediate viewport. orientationchange is listened to as well
   // as resize, since iOS does not guarantee a usefully-timed resize for
   // every rotation.
+  // Width-gated: a phone fires resize every time its address bar or
+  // bottom bar slides away during ordinary scrolling, and that changes
+  // the HEIGHT only. Refreshing on those is both pointless (the pin math
+  // is in svh, which by definition does not move when the bars do) and
+  // actively harmful - a refresh mid-gesture recalculates pin boundaries
+  // underneath a scroll already in progress, which is the jump reported
+  // as content shifting when the toolbar collapses.
+  //
+  // A rotation always changes the width, so gating on width keeps the
+  // case this handler exists for (see the commit that restored it: stale
+  // trigger positions left .closing-section permanently invisible on
+  // iPhone) while ignoring the toolbar. orientationchange stays wired up
+  // unconditionally as a backstop, since iOS does not guarantee a
+  // usefully-timed resize for every rotation.
   let refreshDebounce;
-  const refreshTriggers = () => {
+  let lastWidth = window.innerWidth;
+  const doRefresh = () => {
     clearTimeout(refreshDebounce);
-    refreshDebounce = setTimeout(() => ScrollTrigger.refresh(), 250);
+    refreshDebounce = setTimeout(() => {
+      lastWidth = window.innerWidth;
+      ScrollTrigger.refresh();
+    }, 250);
   };
-  window.addEventListener('resize', refreshTriggers);
-  window.addEventListener('orientationchange', refreshTriggers);
+  window.addEventListener('resize', () => {
+    if (window.innerWidth === lastWidth) return;   // height-only: browser chrome, not a rotation
+    doRefresh();
+  });
+  window.addEventListener('orientationchange', doRefresh);
 
   // .closing-section: a plain fade+rise the moment it scrolls into
   // view, not tied to the master timeline above — it's not part of the
