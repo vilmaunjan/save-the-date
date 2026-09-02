@@ -413,22 +413,30 @@ body.revealed { visibility: visible; }
   will-change: transform;
 }
 
-/* Small tracked-caps line above the cursive tagline — same visual
-   role/sizing family as .from-eyebrow on the envelope screen, just a
-   smaller margin-bottom (0.8em, not 2.6em) since it's introducing a
-   big cursive headline right below it, not separating two comparably-
-   sized text blocks like .from-eyebrow/.from-names does. No
-   opacity:0/fade-in — matches .save-tagline/.save-date, which reveal
-   as part of the whole sky-scene fading in rather than each having
-   their own staggered entrance. */
+/* Small tracked-caps line above the cursive tagline. Originally
+   copied .from-eyebrow's exact styling wholesale (italic, 0.34em
+   spacing, full opacity) since it's the same "small eyebrow above
+   bigger text" role — but .from-eyebrow's actual visual partner is
+   .from-names on a different screen entirely; THIS eyebrow's partner,
+   the thing it's actually seen next to, is .save-date right below the
+   tagline. Matched to that instead: same letter-spacing (was 0.34em,
+   .save-date uses 0.38em — visibly different tracking on two lines
+   framing the same headline reads as unintentional), dropped the
+   italic (.save-date isn't italic), same opacity:0.8 (.save-date
+   dims itself slightly; eyebrow was sitting at full ink-black next to
+   it), and the same padding-left centering nudge .save-date uses to
+   counteract letter-spacing pushing the line off-center. Smaller
+   font-size than .save-date is unchanged/intentional — the mismatch
+   was in spacing/weight/opacity, not scale. */
 .save-eyebrow {
   font-family: 'EB Garamond', serif;
-  font-style: italic;
   font-weight: 500;
   font-size: clamp(0.82rem, 2.05vw, 1.05rem);
   text-transform: uppercase;
-  letter-spacing: 0.34em;
+  letter-spacing: 0.38em;
   color: var(--ink);
+  opacity: 0.8;
+  padding-left: 0.38em;
   margin-bottom: 0.8em;
 }
 
@@ -941,6 +949,9 @@ body.revealed { visibility: visible; }
   .save-eyebrow {
     font-size: clamp(0.7rem, 1.7vw, 0.9rem);
     margin-bottom: 0.45em;
+    /* Keeps eyebrow/date tracking matched at this breakpoint too —
+       .save-date tightens to 0.3em here (below), so eyebrow follows. */
+    letter-spacing: 0.3em;
   }
   .save-tagline {
     font-size: clamp(3rem, 8vw, 5.2rem);
@@ -953,7 +964,15 @@ body.revealed { visibility: visible; }
   .villa-image {
     top: 50%;
     left: auto;
-    right: 4vw;
+    /* Was 4vw — the 1.4x GSAP zoom expands outward from
+       transform-origin:50% 60% (not right-edge-anchored), so it grows
+       past a right offset sized for the unzoomed box. Confirmed by
+       measuring the settled (post-zoom) position directly: at 812px
+       wide (a landscape phone), 4vw put villa's right edge 14px past
+       the viewport edge. 7vw clears it with ~10px to spare, verified
+       at the same width, without introducing any overlap with the
+       tagline text (86px gap there). */
+    right: 7vw;
     margin: 0;
     width: min(34vw, 62dvh);
     max-width: none;
@@ -1037,7 +1056,11 @@ body.revealed { visibility: visible; }
   .villa-image {
     top: 50%;
     left: auto;
-    right: 4vw;
+    /* Kept in sync with the same rule's earlier occurrence above —
+       see that one for why 7vw, not 4vw. This is the copy that
+       actually wins on cascade (later source order), so this is the
+       value that matters in practice. */
+    right: 7vw;
     margin: 0;
     width: min(34vw, 62dvh);
     max-width: none;
