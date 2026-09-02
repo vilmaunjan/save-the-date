@@ -89,7 +89,22 @@ body.revealed { visibility: visible; }
   position: sticky;
   top: 0;
   width: 100vw;
-  height: 100dvh;
+  /* Was 100dvh — dvh tracks the phone browser's toolbar live, which is
+     exactly the problem: GSAP's ScrollTrigger caches its scroll-pin
+     boundary math once (on setup), using whatever dvh happened to be
+     at that moment. If the toolbar then collapses mid-scroll (a real
+     mobile-Safari/Chrome behavior — iPad barely does this, which is
+     why this bug reportedly doesn't show up there), dvh grows, but
+     the CACHED boundaries don't — the pin now needs more real scroll
+     distance to traverse than GSAP thinks it does, which is exactly
+     "extra scroll after the content's already settled." svh is the
+     smallest/stable value (toolbar-visible state) and never changes
+     mid-gesture, so the pin math stays correct throughout. Matched
+     with .scroll-spacer's height below — they need to agree with each
+     other, which they do; using the STABLE unit for both instead of
+     the dynamic one is what actually fixes this, not which specific
+     unit they happen to share. */
+  height: 100svh;
   overflow: hidden;
   cursor: pointer; /* hints the whole screen is clickable, matching "Open the invitation" */
 }
@@ -242,18 +257,27 @@ body.revealed { visibility: visible; }
    100dvh it used to be (this now covers five choreographed beats
    instead of one), so .stage stays pinned that much longer too. */
 .scroll-spacer {
-  /* Must match .stage's unit (100dvh, not 100vh) — dvh resizes with the
-     mobile browser's address bar as it shows/hides, vh doesn't. If the
-     two disagree at page load, this spacer's top edge lands somewhere
-     other than a full screen's worth of scroll below .stage, so the
-     ScrollTrigger fade below reads its "start" point as already passed
-     before you've scrolled anything. */
+  /* Must match .stage's unit — was dvh/dvh (matched to each other,
+     avoiding a start-point misalignment at page load), now svh/svh
+     for the same reason plus one more: dvh tracks the phone toolbar
+     LIVE, but GSAP's ScrollTrigger caches its pin/scroll boundary math
+     once at setup using whatever dvh was at that moment. If the
+     toolbar collapses mid-scroll (real phone-browser behavior; iPad
+     barely does this), dvh grows out from under the cached
+     boundaries, and the pin needs more actual scroll distance to
+     finish than GSAP thinks it does — reported as "extra scroll after
+     the villa's already settled," specifically on phone. svh is the
+     stable/minimum value and doesn't move mid-gesture, so the cached
+     math stays correct for the whole scroll. Keeping both this and
+     .stage on the same unit is still what matters for the original
+     alignment concern — svh for both preserves that agreement, dvh
+     for both is what had the toolbar-drift problem. */
   /* Was 210dvh, sized for a timeline that ran all the way to 6.8 —
-     shrunk to 170dvh now that the zoom/text tweens end at 5.5 instead,
-     so the scroll distance still maps 1:1 onto the shortened timeline
-     rather than leaving a stretch of "dead" scroll at the end where
-     nothing was still animating. */
-  height: 170dvh;
+     shrunk to 170dvh (now 170svh) once the zoom/text tweens end at 5.5
+     instead, so the scroll distance still maps 1:1 onto the shortened
+     timeline rather than leaving a stretch of "dead" scroll at the
+     end where nothing was still animating. */
+  height: 170svh;
 }
 
 /* ---- VILLA — now a layer inside .stage, not its own scene ----
@@ -1042,12 +1066,22 @@ body.revealed { visibility: visible; }
     width: min(34vw, 62dvh);
     max-width: none;
     transform: translateY(-50%) translateX(180%);
+    /* Best-effort, unconfirmed fix for a reported "grey shade below
+       the villa" here — see the synced copy of this rule further down
+       (the one that actually wins on cascade) for the full reasoning.
+       Kept identical here too, same as the rest of this rule. */
+    filter: drop-shadow(0 8px 16px rgba(30, 20, 10, 0.22));
   }
   .villa-caption {
-    left: auto;
-    right: 5vw;
+    /* Was left:auto;right:5vw;width:36vw — right-anchored in a narrow
+       box near the villa. text-align:center (inherited from the base
+       rule) only centers the text WITHIN that narrow box, not across
+       the screen, so it read as stuck off to the right rather than
+       centered — reported directly. The base rule's left:0;right:0
+       (centered across the full width, same convention used
+       everywhere else this caption appears) isn't overridden here
+       anymore, so it's back to that. */
     bottom: 5dvh;
-    width: 36vw;
     font-size: clamp(0.82rem, 1.8vw, 1.1rem);
     letter-spacing: 0.28em;
   }
@@ -1130,6 +1164,20 @@ body.revealed { visibility: visible; }
     width: min(34vw, 62dvh);
     max-width: none;
     transform: translateY(-50%) translateX(180%);
+    /* Best-effort, unconfirmed: reported "weird grey shade below the
+       villa, only in landscape phones" but the actual screenshot for
+       this one didn't come through, so this is reasoned from the
+       code, not something I've seen. The only grey-ish thing near
+       the villa anywhere in this file is its own drop-shadow (base
+       rule, non-media-query) — a dark desaturated brown that can read
+       as grey against parchment. It's fixed-px (18px offset, 34px
+       blur), so it doesn't shrink along with villa's own much smaller
+       size here (~230px vs 400-700px+ elsewhere) — proportionally a
+       much heavier-looking shadow relative to the image than anywhere
+       else on the page. Scaled down to roughly match the size ratio.
+       If this isn't actually the cause, the screenshot would help
+       narrow it down properly instead of guessing again. */
+    filter: drop-shadow(0 8px 16px rgba(30, 20, 10, 0.22));
   }
 }
 
@@ -1435,9 +1483,21 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
   // widened to 1024px to match the villa-image breakpoint above, since
   // an ungated -22vw at tablet widths was exactly what caused the
   // overflow this whole fix is for.
-  const isPhoneLandscape = window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 1000px)').matches;
-  const isNarrowLayout = window.matchMedia('(max-width: 1024px)').matches && !isPhoneLandscape;
-  const saveBlockShift = isNarrowLayout ? '0vw' : (isPhoneLandscape ? '-20vw' : '-22vw');
+  // FUNCTIONS, not one-time consts — these used to be computed once
+  // at page load and baked into the tweens below as fixed strings.
+  // That broke on rotation: CSS media queries always re-evaluate live,
+  // so villa's position/size correctly updated for landscape, but this
+  // JS-computed shift value stayed frozen at whatever it was when the
+  // page first loaded (nearly always portrait, since that's the
+  // default orientation) — reported as "the text feels like it's
+  // staying centered" even though villa had correctly moved for
+  // landscape. GSAP re-invokes function-based tween values whenever
+  // the timeline is invalidated (see the resize/orientationchange
+  // listener below), so these now track the CURRENT orientation
+  // instead of the load-time one.
+  const isPhoneLandscape = () => window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 1000px)').matches;
+  const isNarrowLayout = () => window.matchMedia('(max-width: 1024px)').matches && !isPhoneLandscape();
+  const saveBlockShift = () => isNarrowLayout() ? '0vw' : (isPhoneLandscape() ? '-20vw' : '-22vw');
   // As the villa enlarges below the text (see the max-width:1024px
   // block — villa sits below, not beside, at this width), the
   // save-block was just sitting still at its original spot, leaving a
@@ -1445,9 +1505,14 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
   // bottom portion of the screen. Rising slightly tightens that up. 0
   // above 1024px — the save-block already shifts left there instead,
   // no vertical gap to fix.
-  const saveBlockRise = isNarrowLayout ? '-9vh' : '0vh';
+  const saveBlockRise = () => isNarrowLayout() ? '-9vh' : '0vh';
 
-  gsap.timeline({
+  // Assigned to a variable (not a bare chain) so the resize/
+  // orientationchange listener further down can call .invalidate() on
+  // it — that's what makes the function-based x/y values below
+  // actually get re-evaluated after a rotation, instead of just
+  // sitting there unused.
+  const villaTl = gsap.timeline({
     scrollTrigger: {
       trigger: '.scroll-spacer',
       start: 'top bottom',
@@ -1514,6 +1579,23 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     // Shifted along with the zoom above (now 3.0), so it still appears
     // the instant the zoom starts. Ends at 5.5, in step with the zoom.
     .to('.villa-caption', { opacity: 1, ease: 'none', duration: 2.5 }, 3.0);
+
+  // Rotating a phone/tablet mid-visit doesn't reload the page, but it
+  // DOES change which branch saveBlockShift/saveBlockRise/etc. should
+  // return — invalidate() clears the timeline's cached start values
+  // (forcing it to re-call those functions for fresh ones) and
+  // ScrollTrigger.refresh() recalculates pin/scroll-distance math
+  // against the new dimensions. 150ms debounce because orientation
+  // change can fire resize multiple times in quick succession as the
+  // browser chrome/address bar settles into its new layout.
+  let orientationDebounce;
+  window.addEventListener('resize', () => {
+    clearTimeout(orientationDebounce);
+    orientationDebounce = setTimeout(() => {
+      villaTl.invalidate();
+      ScrollTrigger.refresh();
+    }, 150);
+  });
 
   // .closing-section: a plain fade+rise the moment it scrolls into
   // view, not tied to the master timeline above — it's not part of the
