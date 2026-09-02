@@ -495,6 +495,23 @@ body.revealed { visibility: visible; }
      not just in the em-of-a-different-font-size sense that happened
      to line up at one specific viewport width. */
   margin-bottom: 3.3rem;
+  /* iPhone-specific: reported flickering "as it enters or exits" —
+     matches a known iOS Safari bug class where large text inside a
+     position:sticky section that ALSO gets its own transform tween
+     (see .save-block's GSAP x/y shift in the scroll timeline below)
+     loses stable GPU-layer compositing right at the pin's entry/exit
+     boundaries, causing a visible repaint flicker. .from-names uses
+     the identical cursive font but isn't scroll-transform-driven at
+     all (it's plain intro-screen content) and wasn't reported as
+     flickering — this is the concrete difference between the two.
+     Forces this element onto its own stable compositing layer, the
+     standard fix for that bug class. Can't verify this on a real
+     iPhone myself (no device access, and this browser's engine won't
+     reproduce a WebKit-specific compositing bug) — flag if it's still
+     happening after this. */
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 .save-date {
@@ -811,16 +828,27 @@ body.revealed { visibility: visible; }
      doesn't reveal wrapping, since a wrapped Range's union bbox can
      still look like a single reasonably-sized box. The longer Spanish
      text ("La invitación formal llegará pronto") was the tighter
-     case — true unwrapped width at 0.9rem was 421.9px on a 375px
-     screen. 0.55rem gets it to a single line with ~33px/side margin,
-     confirmed both languages. */
-  font-size: clamp(0.55rem, 2.2vw, 1.15rem);
+     case. Dropped to 0.55rem to fix the wrap, checked against a
+     375px viewport — wrong constraint: this element lives inside
+     .closing-section, which has 24px of padding each side, so the
+     real available width is ~327px, not 375px. That's why a later
+     bump to 0.625rem still wrapped even though it looked safe against
+     the viewport. Fixed properly this time by measuring against the
+     actual container (327px minus this element's own padding-left):
+     font-size alone had almost no room left to grow (0.55->~0.56rem
+     was the entire safe range), so also brought letter-spacing down
+     from 0.42em to 0.2em — freed up enough width to reach 0.6875rem
+     (11px, up from 8.8px) with real margin (~20px) instead of being
+     stuck a fraction of a pixel above where it started. */
+  font-size: clamp(0.6875rem, 2.2vw, 1.15rem);
   text-transform: uppercase;
-  letter-spacing: 0.42em;
+  letter-spacing: 0.2em;
   color: var(--ink);
-  /* nudge right to visually re-center against the letter-spacing,
-     same fix used on .save-date/.open-line elsewhere on this page */
-  padding-left: 0.42em;
+  /* nudge right to visually re-center against the letter-spacing —
+     kept matched to the new 0.2em (was 0.42em to match the old
+     tracking; the whole point of this compensation is to track
+     whatever letter-spacing actually is). */
+  padding-left: 0.2em;
 }
 
 .calendar-block {
