@@ -1671,6 +1671,46 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     // the instant the zoom starts. Ends at 5.5, in step with the zoom.
     .to('.villa-caption', { opacity: 1, ease: 'none', duration: 2.5 }, 3.0);
 
+  // Debounced ScrollTrigger.refresh() on resize/orientationchange.
+  //
+  // This is NOT the old villaTl.invalidate() handler coming back —
+  // invalidate() was the bug (it re-baselined every tween's recorded
+  // start value from the live mid-animation DOM, so the scrubbed
+  // timeline could never reverse) and it stays deleted. refresh() is a
+  // different call that only recalculates each trigger's start/end
+  // scroll positions; it was tested in isolation, before and after that
+  // fix, and causes no jump and no loss of reversal.
+  //
+  // It was removed alongside invalidate() on the reasoning that
+  // ScrollTrigger already auto-refreshes on resize by default. That
+  // holds on desktop — verified — but not reliably on iOS Safari, where
+  // rotation plus the collapsing address bar fires resize repeatedly
+  // while layout is still settling, so GSAP can recompute against
+  // transient dimensions and then never correct itself. The visible
+  // symptom was .closing-section (formal-invitation note, calendar
+  // buttons, countdown) staying invisible after a few scrolls and
+  // rotations, iPhone only, never Android: it starts at opacity 0 in
+  // CSS and is revealed ONLY by a ScrollTrigger at 'top 85%', so a
+  // stale start position means it simply never fades in.
+  //
+  // Positions do drift even without rotation — measured 30px of
+  // staleness in portrait on a page that had only been scrolled — and
+  // nothing else in the page re-syncs them.
+  //
+  // 250ms (the old handler used 150ms) because iOS fires resize several
+  // times in quick succession as the browser chrome settles after a
+  // rotation; this waits for the last one rather than refreshing against
+  // an intermediate viewport. orientationchange is listened to as well
+  // as resize, since iOS does not guarantee a usefully-timed resize for
+  // every rotation.
+  let refreshDebounce;
+  const refreshTriggers = () => {
+    clearTimeout(refreshDebounce);
+    refreshDebounce = setTimeout(() => ScrollTrigger.refresh(), 250);
+  };
+  window.addEventListener('resize', refreshTriggers);
+  window.addEventListener('orientationchange', refreshTriggers);
+
   // .closing-section: a plain fade+rise the moment it scrolls into
   // view, not tied to the master timeline above — it's not part of the
   // .stage choreography (it's not even inside .stage), it just sits in
