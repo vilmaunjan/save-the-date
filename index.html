@@ -427,17 +427,47 @@ body.revealed { visibility: visible; }
    it), and the same padding-left centering nudge .save-date uses to
    counteract letter-spacing pushing the line off-center. Smaller
    font-size than .save-date is unchanged/intentional — the mismatch
-   was in spacing/weight/opacity, not scale. */
+   was in spacing/weight/opacity, not scale. margin-bottom went
+   0.8em (~10px, read as no gap at all against a 60px+-tall cursive
+   headline) -> 2.6em (~34px, matching .from-eyebrow's own value
+   above .from-names) -> 4em (~52px) per direct feedback that 2.6em
+   still wasn't enough. Checked there's room for it — no collision
+   with the monogram above or .save-date/.villa-caption below at
+   375px. */
 .save-eyebrow {
   font-family: 'EB Garamond', serif;
   font-weight: 500;
-  font-size: clamp(0.82rem, 2.05vw, 1.05rem);
+  /* Sizing history: own smaller clamp -> matched .save-date exactly
+     (too big, reverted) -> smaller again ("is smaller which is
+     fine") -> briefly made bigger than .save-date based on a
+     misreading of a reference image's size guide — corrected once the
+     actual reference was confirmed to show eyebrow SMALLER than date,
+     matching what was already live -> nudged up ~10% (0.82/2.05/1.05
+     -> 0.9/2.2/1.15) per "slightly bigger" feedback. Checked this
+     doesn't cross over .save-date's own size anywhere in between —
+     the two clamp() curves don't scale at the same rate, so a small
+     bump can still flip which one's bigger at some in-between width
+     even if it looks fine at the floor and cap. Swept both formulas
+     across 300-2000px: closest point is ~710px (tablet range) where
+     .save-date is still ~0.7px bigger — holds, just not by much. */
+  font-size: clamp(0.9rem, 2.2vw, 1.15rem);
   text-transform: uppercase;
   letter-spacing: 0.38em;
   color: var(--ink);
   opacity: 0.8;
   padding-left: 0.38em;
-  margin-bottom: 0.8em;
+  /* Fixed rem, not em: was 4em, which is relative to THIS element's
+     own font-size. .save-tagline's matching margin-bottom below is
+     also now a fixed rem (was 0.5em, relative to ITS much bigger
+     font-size) — both had to move off em and onto a shared fixed unit
+     for the gap above and below the tagline to actually stay equal,
+     since eyebrow/date and tagline scale on very different clamp()
+     curves; two em-based margins on different-sized elements can
+     match at one viewport width and diverge at another. 3.3rem here
+     matches .save-tagline's margin-bottom exactly (~52.8px) — same
+     target the earlier 4em landed on at 375px, just now guaranteed
+     equal at every width instead of only that one. */
+  margin-bottom: 3.3rem;
 }
 
 .save-tagline {
@@ -460,7 +490,11 @@ body.revealed { visibility: visible; }
   font-size: clamp(3.8rem, 9vw, 7.4rem);
   line-height: 1;
   color: var(--ink);
-  margin-bottom: 0.5em;
+  /* Fixed rem (was 0.5em) — see .save-eyebrow's margin-bottom comment
+     above for why: this needs to equal that value in absolute terms,
+     not just in the em-of-a-different-font-size sense that happened
+     to line up at one specific viewport width. */
+  margin-bottom: 3.3rem;
 }
 
 .save-date {
@@ -480,7 +514,10 @@ body.revealed { visibility: visible; }
      1.4rem the real unwrapped width was 373.4px on a 375px screen —
      0.8px to spare, which is why it was actually wrapping to 2 lines
      in practice. 1rem leaves ~54px/side margin and stays single-line,
-     confirmed both languages. */
+     confirmed both languages. Briefly shrunk below .save-eyebrow's
+     size (reusing its old range) based on a misread reference image —
+     reverted back to this once the actual reference was confirmed to
+     show the date BIGGER than the eyebrow, same as before. */
   font-size: clamp(1rem, 2.3vw, 1.95rem);
   text-transform: uppercase;
   letter-spacing: 0.38em;
