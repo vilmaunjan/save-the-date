@@ -1038,6 +1038,40 @@ body.revealed { visibility: visible; }
      letterboxed strip reads as more envelope, not empty page. */
   .envelope-photo { background-size: contain; }
 
+  /* ---- SAVE-THE-DATE SCREEN SPACING (phone portrait only) ----
+     Reported: "Orlando" sits too close to the villa, "Scroll for more"
+     isn't close enough to the bottom, and the gap from it down to
+     "Formal invitation to follow" is too big. Desktop reads correctly
+     and is untouched.
+
+     Root cause is the UNIT, not the numbers. Both elements are
+     absolutely positioned inside .stage, which is 100svh — but their
+     offsets were vh. On desktop vh and svh are identical, so the base
+     values look right. On a phone vh is the LARGE viewport (address bar
+     hidden) while svh is the small one, so `bottom: 14vh` resolves
+     against a taller reference than the box it lives in and both
+     elements sit higher inside .stage than intended — squeezing the
+     caption up against the villa above it while leaving too much room
+     below the hint. Switching to svh makes the offsets resolve against
+     the same height .stage itself uses.
+
+     Measured at 390x844 with the villa fully slid in, before: villa
+     bottom -> caption top 11px, caption -> hint 50px, hint -> screen
+     bottom 51px. After: ~40 / ~41 / ~30 — the caption gets real
+     separation from the villa, and the hint sits closer to the bottom
+     edge, which also shortens the run into .closing-section below. */
+  .villa-caption { bottom: 10.5svh; }
+  .scroll-hint   { bottom: 3.5svh; }
+
+  /* Third part of the same report: the gap between "Scroll for more"
+     and "Formal invitation to follow". That gap is the hint's distance
+     from .stage's bottom edge PLUS this section's own top padding —
+     ~51 + 48 = ~99px before. The hint moving down (above) takes out
+     ~21px; trimming the top padding here takes out another ~16px,
+     landing around 62px. Only padding-top is overridden — the side and
+     bottom padding from the base shorthand still apply. */
+  .closing-section { padding-top: 2rem; }
+
 }
 
 /* ---- MOBILE LANDSCAPE ----
