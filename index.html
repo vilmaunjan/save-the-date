@@ -638,6 +638,15 @@ body.revealed { visibility: visible; }
   transform: scaleX(-1);
   opacity: 0;
   pointer-events: none;
+  /* .open-line/.from-block carry z-index:2; .duque-rest has z-index:auto.
+     z-index:1 places Oliver above the resting Duque while keeping both
+     below the text. Avoiding z-index:2 here is intentional — that would
+     tie with .open-line and DOM order would resolve the tie anyway, but
+     ties are fragile and unclear. This has no visual effect at desktop,
+     portrait, or iPad where the sprites never overlap; it only changes
+     the paint order in phone landscape where Duque's lane and Oliver's
+     run lane intersect. */
+  z-index: 1;
   /* The two animations are intentionally independent: oliverRunCycle
      is his leg/gait pace (how fast he's running in place) and stays
      fixed regardless of crossing speed — only oliverRunAcross's
@@ -698,6 +707,9 @@ body.revealed { visibility: visible; }
   background-size: 800% 100%;
   opacity: 0;
   pointer-events: none;
+  /* z-index:1 matches .oliver-run — same reasoning: above .duque-rest
+     (auto) but below text at z-index:2. See .oliver-run comment above. */
+  z-index: 1;
   /* No delay on either animation — the ball starts moving and
      bouncing the instant the page loads, unlike Oliver (1s delay,
      see .oliver-run). */
@@ -729,7 +741,11 @@ body.revealed { visibility: visible; }
    cycle). No left/right movement — just the idle frame-cycle. Was
    originally bottom:0 on the same row Oliver/the ball run across,
    which meant their sprite boxes visibly crossed through him mid-
-   chase; moved up here instead, off that lane entirely, positioned
+   chase; moved up here instead. In portrait this puts him off that lane
+   entirely (bottom:18vh = ~146px at 812px screen height, well clear of
+   Oliver's ~57px run lane). In phone landscape the viewport compresses
+   and the landscape block overrides his bottom to 9dvh (was) / 17dvh
+   (now) — see the phone-landscape block for the separation fix. Positioned
    like he's resting on the last word of .open-line ("...invitation").
    `left` is a measured (not guessed) center-alignment: got the actual
    rendered bounding box of the word "invitation" in .open-line via
@@ -1036,7 +1052,12 @@ body.revealed { visibility: visible; }
   .from-eyebrow { margin-bottom: 1em; }
   .from-names {
     margin-top: 0.25em;
-    font-size: clamp(2.6rem, 8vw, 4.2rem);
+    /* Cap at 12dvh so the name doesn't dominate the cramped landscape
+       height. At 375px height: 8vw=65px but 12dvh=45px → 45px wins
+       (~12% of height vs 17% before). At 414px height: 12dvh=49.7px,
+       still well legible. The clamp's 2.6rem floor stays in force — this
+       is only a ceiling, not a replacement for the vw-based sizing. */
+    font-size: min(clamp(2.6rem, 8vw, 4.2rem), 12dvh);
   }
   .open-line {
     bottom: 6dvh;
@@ -1044,9 +1065,37 @@ body.revealed { visibility: visible; }
     letter-spacing: 0.28em;
   }
   .duque-rest {
-    bottom: 9dvh;
+    /* Raised from 9dvh to 17dvh to clear Oliver's run lane once Oliver
+       is sized down (see .oliver-run below). At 375px height: Oliver top
+       = ~53.6px; 17dvh = 63.75px gives a ~10px gap above him. Still
+       well clear of .open-line (bottom:6dvh = 22.5px) — Duque's bottom
+       edge is 41px above .open-line's bottom edge, no text collision. */
+    bottom: 17dvh;
     left: calc(68vw - 45px);
-    width: clamp(70px, 15vw, 105px);
+    /* Width capped at 22dvh so Duque's height stays 12-14% of viewport
+       height. At 375px: 22dvh=82.5px → height=82.5*(220/379)=47.8px
+       (12.7%). The base clamp(90-140px) reads fine at portrait's 812px
+       tall, but at 375px it renders oversized relative to the scene.
+       aspect-ratio is NOT touched — only width changes, aspect-ratio
+       drives height from width, preserving the sprite animation. */
+    width: min(clamp(70px, 15vw, 105px), 22dvh);
+  }
+  /* Oliver: cap width at 25dvh so his height stays ~13-15% of viewport
+     height in landscape. At 375px: 25dvh=93.75px → height=93.75*(220/385)
+     =53.6px (14.3% of height). The base clamp(100-160px) hits its 160px
+     ceiling here (24vw=194px clamped), making Oliver 91px tall — 24% of
+     a 375px viewport, which dominates the scene. aspect-ratio and
+     background-size are NOT overridden — those drive the frame-stepping
+     animation and must remain untouched. */
+  .oliver-run {
+    width: min(clamp(100px, 24vw, 160px), 25dvh);
+  }
+  /* Ball: dvh cap matched to Oliver's to keep the tennis-ball-beside-a-
+     dog ratio (~14% of Oliver's width) from the base rule. At 375px:
+     3.5dvh=13.1px, which is 14% of Oliver's 93.75px — same ratio, smaller
+     absolute size. aspect-ratio and background-size are NOT touched. */
+  .ball-run {
+    width: min(clamp(14px, 3.2vw, 22px), 3.5dvh);
   }
   .envelope-photo { background-size: contain; }
   .monogram {
