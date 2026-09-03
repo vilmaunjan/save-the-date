@@ -130,7 +130,14 @@ body.unlocked .couple-villa-scroll { background: var(--parchment); }
      of scrolling away together with the photo underneath it. */
   position: sticky;
   top: 0;
-  width: 100vw;
+  /* Was 100vw — on notched iPhones in landscape, Safari can compute
+     100vw narrower than the true full-bleed width even with
+     viewport-fit=cover set (a documented WebKit quirk distinct from
+     how it resolves 100%), leaving a real gap on one side. html/body
+     have no width rule of their own, so their auto width already
+     equals the correct full-bleed viewport — 100% inherits that
+     correctly where 100vw does not. */
+  width: 100%;
   /* Was 100dvh — dvh tracks the phone browser's toolbar live, which is
      exactly the problem: GSAP's ScrollTrigger caches its scroll-pin
      boundary math once (on setup), using whatever dvh happened to be
@@ -286,6 +293,24 @@ body.unlocked .couple-villa-scroll { background: var(--parchment); }
   mask-image: linear-gradient(to left, transparent 0%, transparent var(--wipe), black calc(var(--wipe) + 22%), black 100%);
   will-change: transform, opacity;
 }
+
+/* Toolbar-collapse seam below the couple photo (phone only): tried
+   twice, reverted twice, still unsolved.
+   - Attempt 1: second mask-image layer + mask-composite:intersect.
+     Looked valid (CSS.supports, computed style) but silently didn't
+     render on Android Chrome - confirmed with a red-background test.
+   - Attempt 2: ::after gradient overlay fading the photo's bottom 12%
+     to parchment. Rendered correctly in testing (confirmed with a
+     lime-color swap) and passed every check available here, but on
+     the actual device it added a visible band of its own AND the hard
+     edge below it was still there - reported directly, reverted.
+   Root cause (the exposed strip below .stage's frozen 100svh, filled
+   with a flat fallback color when the real toolbar collapses) is still
+   believed correct; the fix attempts are what failed. Real toolbar
+   collapse can't be reproduced in this project's testing tools, so
+   further attempts here would face the same blind-guess problem — next
+   attempt should start from an on-device screenshot/description of
+   exactly where the line sits, not another guess from this end. */
 
 /* Pure scroll room — no content of its own. Gives the (sticky-pinned)
    .stage something to scroll against so everything below has a scroll
@@ -1116,7 +1141,19 @@ body.unlocked .couple-villa-scroll { background: var(--parchment); }
    vertical elements. The max-height guard keeps this from changing
    iPad/tablet landscape layouts. */
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1000px) {
-  .from-block { top: 5dvh; }
+  /* Was 5dvh, then 9dvh — the 9dvh attempt was still an eyeballed
+     estimate and only cleared the envelope's actual top edge by
+     ~2.7px (still read as touching on a real device). Pixel-sampled
+     the envelope artwork directly this time (canvas + getImageData,
+     scanned 9 columns for the first row that differs from the
+     background color): the top edge sits at a consistent 8.2-8.7% of
+     the image's height, ~31px at this viewport, not the ~25-30px
+     estimated visually before. 13dvh (48.75px) gives it real,
+     measured clearance (~17.6px) instead of a hair's width. Portrait
+     phone has its own separate breakpoint (max-width:480px) and isn't
+     affected by this one at all — the two media queries can't both
+     match the same screen. */
+  .from-block { top: 13dvh; }
   .from-eyebrow { margin-bottom: 1em; }
   .from-names {
     margin-top: 0.25em;
@@ -1127,19 +1164,34 @@ body.unlocked .couple-villa-scroll { background: var(--parchment); }
        is only a ceiling, not a replacement for the vw-based sizing. */
     font-size: min(clamp(2.6rem, 8vw, 4.2rem), 12dvh);
   }
+  /* Was bottom:40dvh (near the seal) — moved back down to Duque's old
+     spot (17dvh, the value his box used before this change) per
+     request: text at the height Duque used to be, Duque now above the
+     text instead of beside/below it. Still clear of Oliver's run lane
+     (top edge 53.6px at 375px height) — 17dvh=63.75px leaves a ~10px
+     gap, the same clearance Duque himself relied on at this same
+     value. */
   .open-line {
-    bottom: 6dvh;
-    font-size: clamp(0.72rem, 1.8vw, 0.95rem);
+    bottom: 17dvh;
+    font-size: clamp(0.65rem, 1.5vw, 0.85rem);
     letter-spacing: 0.28em;
   }
   .duque-rest {
-    /* Raised from 9dvh to 17dvh to clear Oliver's run lane once Oliver
-       is sized down (see .oliver-run below). At 375px height: Oliver top
-       = ~53.6px; 17dvh = 63.75px gives a ~10px gap above him. Still
-       well clear of .open-line (bottom:6dvh = 22.5px) — Duque's bottom
-       edge is 41px above .open-line's bottom edge, no text collision. */
-    bottom: 17dvh;
-    left: calc(68vw - 45px);
+    /* Went through several positions here (dead-center: crowded the
+       seal; anchored near "Click": reported directly as wrong side,
+       marked the intended spot directly on a screenshot instead of
+       another guess). Target is above "INVITATION"/"invitación" - both
+       words measured directly (Range.getBoundingClientRect on each
+       language string): English spans 422.5-527.7px, Spanish
+       451.1-556.3px at 812px width, sharing 451.1-527.7px in common.
+       60vw (487.2px) sits centered in that shared zone, matching the
+       marked spot. bottom:23dvh clears .open-line's top by a measured
+       6.5px (bottom:19dvh and 20dvh were both tried first and actually
+       overlapped by a measured 4.7px - not just "close", raised until
+       real clearance existed). */
+    bottom: 23dvh;
+    left: 60vw;
+    transform: translateX(-50%);
     /* Width capped at 22dvh so Duque's height stays 12-14% of viewport
        height. At 375px: 22dvh=82.5px → height=82.5*(220/379)=47.8px
        (12.7%). The base clamp(90-140px) reads fine at portrait's 812px
@@ -1181,7 +1233,16 @@ body.unlocked .couple-villa-scroll { background: var(--parchment); }
   }
   .save-eyebrow {
     font-size: clamp(0.7rem, 1.7vw, 0.9rem);
-    margin-bottom: 0.45em;
+    /* Was 0.45em — the exact anti-pattern the base rule's own
+       margin-bottom comment (above, ~line 542) warns about: em is
+       relative to THIS element's own font-size, which is tiny here
+       (~14px), so 0.45em resolved to just 6.2px next to a 65px-tall
+       tagline — measured as an actual overlap-adjacent crowd, not
+       just visually tight. Fixed rem instead, same reasoning as the
+       base rule. 1.3rem (~21px) reads as clear separation without
+       eating into the ~78px of empty space that already sits between
+       .save-date and .villa-caption below it at this breakpoint. */
+    margin-bottom: 1.3rem;
     /* Keeps eyebrow/date tracking matched at this breakpoint too —
        .save-date tightens to 0.3em here (below), so eyebrow follows. */
     letter-spacing: 0.3em;
@@ -1225,12 +1286,17 @@ body.unlocked .couple-villa-scroll { background: var(--parchment); }
        (centered across the full width, same convention used
        everywhere else this caption appears) isn't overridden here
        anymore, so it's back to that. */
-    bottom: 5dvh;
+    /* Was 5dvh — measured at 812x375 the two boxes actually overlapped:
+       .villa-caption ran 337-356px from top, .scroll-hint 351-366px, a
+       genuine 5.7px intersection, not just visual crowding. 9dvh (34px)
+       raises this one and 2dvh (7.5px, below) lowers the hint slightly,
+       leaving an real ~11px gap between them. */
+    bottom: 9dvh;
     font-size: clamp(0.82rem, 1.8vw, 1.1rem);
     letter-spacing: 0.28em;
   }
   .scroll-hint {
-    bottom: 2.5dvh;
+    bottom: 2dvh;
     font-size: 0.72rem;
   }
   .closing-section {
@@ -1929,6 +1995,23 @@ function startEnvelopeTransition() {
       onComplete: () => {
         window.scrollTo(0, 0);
         document.body.classList.add('unlocked');
+        // The couple-photo ScrollTrigger's start/end pixel boundaries
+        // were calculated once, synchronously, back when the script
+        // first ran - while body still had overflow:hidden (locked,
+        // not scrollable). Going locked -> unlocked here is a real
+        // layout-relevant change (on Android specifically, becoming
+        // scrollable can shift how the toolbar behaves), and nothing
+        // was telling ScrollTrigger to recheck it - unlike every
+        // resize/orientationchange, which already gets a refresh()
+        // below. That stale boundary is what let the couple photo read
+        // as already-faded-in at scrollY 0, before any real scrolling.
+        // Safe to call here specifically: only refresh() (recalculates
+        // trigger boundaries), not invalidate() (the one proven
+        // destructive to tween start values - see the resize handler's
+        // own history below) - and called exactly once, synchronously,
+        // at a moment scrollY is guaranteed to be 0 from the line
+        // above, not mid-gesture.
+        ScrollTrigger.refresh();
       }
     }, reduceMotion ? 0 : 0.15);
 }
